@@ -92,12 +92,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
-}
-
-.profile-avatar-fallback {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  line-height: 1;
+}
+
+.profile-avatar-fallback {
   background: var(--accent);
   color: #fff;
   font-size: 13px;
@@ -105,21 +106,19 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 
 .profile-avatar-chip {
-  width: 26px;
-  height: 26px;
   border-radius: 50%;
-  flex-shrink: 0;
 }
 
 .profile-avatar-emoji {
   background: var(--panel);
   color: inherit;
   font-weight: 400;
-  line-height: 1;
 }
 
 .profile-avatar-chip.profile-avatar-emoji {
-  font-size: 15px;
+  font-size: 14px;
+  /* Emoji glyphs often sit high in the box; nudge down slightly. */
+  padding-top: 1px;
 }
 
 .profile-tile-avatar.profile-avatar-emoji {
