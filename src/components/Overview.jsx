@@ -53,7 +53,7 @@ export default function Overview({ store, onOpenBook }) {
     const blob = new Blob([exportJSON()], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "verse-trail-reads.json";
+    a.download = "bible-viz-reads.json";
     a.click();
     URL.revokeObjectURL(a.href);
   };

@@ -1,4 +1,4 @@
-# Verse Trail — Bible Reading Visualizer
+# Bible Viz — Bible Reading Visualizer
 
 Track when and how often you've read each Bible verse, and see it at a glance.
 

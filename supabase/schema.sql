@@ -1,4 +1,4 @@
--- Verse Trail — Supabase schema (shared-profiles model, no login)
+-- Bible Viz — Supabase schema (shared-profiles model, no login)
 --
 -- Run once in Supabase → SQL Editor → New query → paste → Run.
 -- This REPLACES the earlier auth-based schema: it drops the old profiles/reads

@@ -81,7 +81,7 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <button className="brand" onClick={() => setView({ name: "overview" })}>
-          <span className="brand-mark">✦</span> Verse Trail
+          <span className="brand-mark">✦</span> Bible Viz
         </button>
         <nav>
           <button
