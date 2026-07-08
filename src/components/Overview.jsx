@@ -2,6 +2,8 @@ import { useRef, useState } from "react";
 import { BIBLE, OT_COUNT } from "../data/bibleMeta";
 import { coverageByBook, overallStats, topVerses } from "../lib/aggregate";
 import { fmtDate } from "../lib/store";
+import { buildUniversalExport, buildMarkdownExport } from "../lib/exportBundle";
+import { SEED_NOTES } from "../data/seedNotes";
 import ReadEntryRow from "./ReadEntryRow";
 import ReadingCalendar from "./ReadingCalendar";
 
@@ -36,12 +38,13 @@ function BookGrid({ books, coverage, onOpenBook }) {
   );
 }
 
-export default function Overview({ store, onOpenBook }) {
+export default function Overview({ store, notesStore, profile, onOpenBook }) {
   const { reads, deleteRead, exportJSON, importReads } = store;
   const [expanded, setExpanded] = useState(null);
   const [showCount, setShowCount] = useState(15);
   const [showLogCount, setShowLogCount] = useState(20);
   const fileRef = useRef();
+  const notesFileRef = useRef();
 
   const stats = overallStats(reads);
   const coverage = coverageByBook(reads);
@@ -68,6 +71,53 @@ export default function Overview({ store, onOpenBook }) {
       alert(`Import failed: ${err.message}`);
     }
     e.target.value = "";
+  };
+
+  const download = (text, filename, type) => {
+    const blob = new Blob([text], { type });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  // Universal export: everything (reads + per-verse read counts + notes + refs +
+  // tags + dates) in one JSON bundle, portable to any tool or AI.
+  const doExportAll = () => {
+    const bundle = buildUniversalExport({
+      profile,
+      reads,
+      notes: notesStore?.exportNotes() ?? [],
+    });
+    download(JSON.stringify(bundle, null, 2), "bible-viz-export.json", "application/json");
+  };
+
+  const doExportMarkdown = () => {
+    download(buildMarkdownExport(notesStore?.notes ?? []), "bible-viz-notes.md", "text/markdown");
+  };
+
+  const doImportNotes = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const n = await notesStore.importNotes(await file.text());
+      alert(`Imported ${n} note${n === 1 ? "" : "s"}.`);
+    } catch (err) {
+      alert(`Note import failed: ${err.message}`);
+    }
+    e.target.value = "";
+  };
+
+  // Load the built-in sample notes as reference templates. Idempotent — the
+  // samples have stable ids, so clicking again won't duplicate them.
+  const doLoadSamples = async () => {
+    try {
+      const added = await notesStore.addNotes(SEED_NOTES);
+      alert(`Loaded ${added.length} sample note${added.length === 1 ? "" : "s"} to reference.`);
+    } catch (err) {
+      alert(`Could not load samples: ${err.message}`);
+    }
   };
 
   return (
@@ -155,10 +205,32 @@ export default function Overview({ store, onOpenBook }) {
         </section>
       )}
 
-      <section className="data-row">
-        <button className="ghost-btn" onClick={doExport}>Export data (JSON)</button>
-        <button className="ghost-btn" onClick={() => fileRef.current.click()}>Import data</button>
-        <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={doImport} />
+      <section>
+        <h2>Data &amp; notes</h2>
+        <p className="section-hint">
+          Notes are authored with AI and brought in here (JSON or Markdown, see{" "}
+          <code>docs/NOTE_FORMAT.md</code>). New to it? <strong>Load sample notes</strong>{" "}
+          to keep a set of worked examples as reference templates. The universal export
+          carries everything — reads, read counts, notes, cross-references, tags, dates.
+        </p>
+        <div className="data-row">
+          <button className="primary-btn" onClick={doExportAll}>Export everything (JSON)</button>
+          <button className="ghost-btn" onClick={doExportMarkdown}>Export notes (Markdown)</button>
+          <button className="ghost-btn" onClick={() => notesFileRef.current.click()}>Import notes</button>
+          <button className="ghost-btn" onClick={doLoadSamples}>Load sample notes</button>
+          <input
+            ref={notesFileRef}
+            type="file"
+            accept=".json,.md,.markdown,application/json,text/markdown"
+            hidden
+            onChange={doImportNotes}
+          />
+        </div>
+        <div className="data-row">
+          <button className="ghost-btn" onClick={doExport}>Export reads only (JSON)</button>
+          <button className="ghost-btn" onClick={() => fileRef.current.click()}>Import reads</button>
+          <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={doImport} />
+        </div>
       </section>
     </main>
   );

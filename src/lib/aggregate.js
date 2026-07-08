@@ -51,6 +51,23 @@ export function topVerses(reads) {
   return list;
 }
 
+// Reads covering a note anchor (book / chapter / verse-range). Returns
+// { events, days, lastDate } — how much the anchored passage has been read.
+export function readStatsForAnchor(reads, anchor) {
+  if (!anchor?.book) return { events: 0, days: 0, lastDate: null };
+  const matched = reads.filter((r) => {
+    if (r.book !== anchor.book) return false;
+    if (anchor.chapter == null) return true;
+    if (r.chapter !== anchor.chapter) return false;
+    if (anchor.verseStart == null) return true;
+    const aEnd = anchor.verseEnd ?? anchor.verseStart;
+    return r.end >= anchor.verseStart && r.start <= aEnd; // ranges overlap
+  });
+  const days = new Set(matched.map((r) => r.date));
+  const lastDate = matched.reduce((mx, r) => (r.date > mx ? r.date : mx), "");
+  return { events: matched.length, days: days.size, lastDate: lastDate || null };
+}
+
 export function overallStats(reads) {
   const coverage = coverageByBook(reads);
   let unique = 0;

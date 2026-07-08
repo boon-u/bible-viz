@@ -1,9 +1,30 @@
-# Bible Viz — Bible Reading Visualizer
+# Bible Viz — Bible Reading Visualizer & Study Notebook
 
-Track when and how often you've read each Bible verse, and see it at a glance.
+Track when and how often you've read each Bible verse, **and keep an ever-living
+repository of your study notes** — cross-referenced, tagged, searchable, and
+plotted as a connection graph. Built to grab fast while prepping a sermon or a
+Bible study.
 
 No Bible text is stored — only references (`Book Chapter:Verse`), read counts,
-and dates.
+dates, and **your own notes**.
+
+## Notes at a glance
+
+- **Read-only viewer.** You don't type notes into the site — you author them with
+  an AI in a documented format ([`docs/NOTE_FORMAT.md`](docs/NOTE_FORMAT.md)) and
+  **Import** them on the Overview. Live editing is a planned future add.
+- **Anchored + cross-referenced.** Each note attaches to a verse, passage, chapter,
+  book, or a pure topic, and can point to other passages — those become clickable
+  chips and edges in the graph.
+- **Graph view.** A flat-2D constellation of notes ↔ topics ↔ passages; passage
+  nodes brighten with how often you've read them, tying the two halves together.
+- **⌘K / Ctrl-K** anywhere to jump to any note, topic, or reference.
+- **Universal export.** One JSON bundle with everything (reads, per-verse read
+  counts, notes, cross-references, tags, dates) plus a combined Markdown export
+  that drops into Obsidian/Notion or back into an AI prompt.
+- **Scoped to your profile** (personal prep material), unlike reads which the
+  group shares. Text only today; the schema already reserves image/PDF attachments
+  for later.
 
 The app runs in two modes:
 
@@ -39,6 +60,12 @@ No Google login or OAuth setup required.
    [`supabase/migrations/001_add_avatar.sql`](supabase/migrations/001_add_avatar.sql)
    once to add the `avatar` column for emoji profile icons.
 
+   **For notes**, also run
+   [`supabase/migrations/002_notes.sql`](supabase/migrations/002_notes.sql) once.
+   It's additive (leaves `profiles`/`reads` untouched) and creates the `notes`,
+   `note_refs`, and a reserved-for-later `note_attachments` table. In local mode
+   (no Supabase) notes just live in `localStorage`, seeded with a few samples.
+
 ### 2. Point the app at your project
 
 ```bash
@@ -54,8 +81,13 @@ first pick, any reads already saved on that device are offered for one-click upl
 > key is safe to ship in the browser; this model is intended for a small,
 > trusted group on a private URL (anyone with access can edit any profile).
 
-## The three views
+## The views
 
+- **Notes** — browse/search/filter your notes by book, category, or topic; open
+  one to read it (rendered Markdown, clickable cross-references, and how often its
+  passage has been read).
+- **Graph** — the connection constellation. Hover a node to light its links; click
+  a note to read it, a passage to open its heatmap, a topic to browse it.
 - **Overview** — total stats, per-book coverage bars for all 66 books,
   a "most read verses" table (click a reference to jump to it in the book
   view, or expand its full date history), recent activity, and JSON

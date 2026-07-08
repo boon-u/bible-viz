@@ -1,0 +1,139 @@
+// Sample study notes shipped so the app is populated on first open (local mode,
+// zero setup) — they demonstrate every anchor level (verse / passage / chapter /
+// book / topic), cross-references, and shared tags that connect in the graph.
+//
+// These are in the *import* shape (see docs/NOTE_FORMAT.md): `refs` are plain
+// strings, parsed by src/lib/refs.js when normalized. Stable ids keep re-seeding
+// idempotent. Delete freely — your own imported notes are never overwritten.
+
+export const SEED_NOTES = [
+  {
+    id: "seed-rom8-28",
+    title: "God works all things for good",
+    book: "Romans",
+    chapter: 8,
+    verseStart: 28,
+    verseEnd: 30,
+    category: "application",
+    tags: ["providence", "assurance", "salvation"],
+    body:
+      "Paul's climax of assurance. The **\"good\"** is not comfort but being\n" +
+      "*conformed to the image of the Son* (v29). Then the golden chain:\n" +
+      "foreknew → predestined → called → justified → glorified — every link the\n" +
+      "same people, none lost.\n\n" +
+      "Compare [[Genesis 50:20]]: what others meant for evil, God meant for good.",
+    refs: ["Genesis 50:20", "Jeremiah 29:11", "Ephesians 1:4-5"],
+    source: "seed",
+  },
+  {
+    id: "seed-rom8-1",
+    title: "No condemnation",
+    book: "Romans",
+    chapter: 8,
+    verseStart: 1,
+    verseEnd: 1,
+    category: "word-study",
+    tags: ["assurance", "grace", "law"],
+    body:
+      "*Katakrima* (condemnation) — a judicial verdict, not a feeling. The chapter\n" +
+      "opens where chapter 7's struggle ends: the verdict is already delivered for\n" +
+      "those *in Christ Jesus*.",
+    refs: ["Romans 7:24-25", "John 3:18"],
+    source: "seed",
+  },
+  {
+    id: "seed-rom8-intro",
+    title: "Romans 8 — the mountain-top chapter",
+    book: "Romans",
+    chapter: 8,
+    category: "intro",
+    tags: ["assurance", "holy-spirit"],
+    body:
+      "Often called the greatest chapter in the Bible. Movement: **no condemnation**\n" +
+      "(1-4) → **life in the Spirit** (5-17) → **groaning creation & hope** (18-27) →\n" +
+      "**unbreakable love** (28-39). The Spirit is named ~19× after being nearly\n" +
+      "absent in ch.7.",
+    refs: ["Romans 7:1-25"],
+    source: "seed",
+  },
+  {
+    id: "seed-romans-book",
+    title: "Romans — background",
+    book: "Romans",
+    category: "background",
+    tags: ["paul", "gospel", "justification"],
+    body:
+      "Written ~AD 57 from Corinth to a church Paul had not yet visited, ahead of a\n" +
+      "hoped-for trip to Spain. His most systematic statement of the gospel: the\n" +
+      "righteousness of God revealed for Jew and Gentile alike, received by faith.",
+    refs: ["Romans 1:16-17", "Acts 20:2-3"],
+    source: "seed",
+  },
+  {
+    id: "seed-john3-16",
+    title: "For God so loved the world",
+    book: "John",
+    chapter: 3,
+    verseStart: 16,
+    verseEnd: 16,
+    category: "sermon",
+    tags: ["love", "salvation", "faith"],
+    body:
+      "The gospel in one sentence. *Houtos* = **\"in this way\"** loved — pointing back\n" +
+      "to the lifted-up serpent (v14-15): love shown by the Son lifted up on the\n" +
+      "cross. \"Whosoever\" throws the door wide.",
+    refs: ["Numbers 21:8-9", "John 3:14-15", "Romans 5:8"],
+    source: "seed",
+  },
+  {
+    id: "seed-john3-chapter",
+    title: "Nicodemus & the new birth",
+    book: "John",
+    chapter: 3,
+    category: "background",
+    tags: ["holy-spirit", "salvation"],
+    body:
+      "A Pharisee comes *by night*. Jesus reframes religion as **rebirth**, not\n" +
+      "reform — born of water and Spirit. The wind/Spirit wordplay (*pneuma*) drives\n" +
+      "the whole dialogue.",
+    refs: ["Ezekiel 36:25-27", "John 1:12-13"],
+    source: "seed",
+  },
+  {
+    id: "seed-ps23",
+    title: "The LORD is my shepherd",
+    book: "Psalms",
+    chapter: 23,
+    category: "application",
+    tags: ["comfort", "providence", "trust"],
+    body:
+      "David moves from speaking *about* God (\"He\") to speaking *to* God (\"you\") at\n" +
+      "the valley (v4) — intimacy deepens precisely in the dark. Shepherd imagery\n" +
+      "picked up by Jesus in [[John 10:11]].",
+    refs: ["John 10:11", "Psalm 23:1", "Isaiah 40:11"],
+    source: "seed",
+  },
+  {
+    id: "seed-topic-assurance",
+    title: "Topic: Assurance of salvation",
+    category: "topic",
+    tags: ["assurance", "salvation", "grace"],
+    body:
+      "A thread to preach or teach: God's keeping, not our gripping. Anchor in\n" +
+      "[[Romans 8:38-39]], [[John 10:28]], and [[Philippians 1:6]] — begun, carried,\n" +
+      "completed by God.",
+    refs: ["Romans 8:38-39", "John 10:28", "Philippians 1:6"],
+    source: "seed",
+  },
+  {
+    id: "seed-topic-holyspirit",
+    title: "Topic: The Holy Spirit",
+    category: "topic",
+    tags: ["holy-spirit", "salvation"],
+    body:
+      "Regeneration ([[John 3:5]]), indwelling and intercession ([[Romans 8:26-27]]),\n" +
+      "sealing ([[Ephesians 1:13-14]]). The same Spirit who hovered at creation.",
+    refs: ["John 3:5", "Romans 8:26-27", "Ephesians 1:13-14", "Genesis 1:2"],
+    source: "seed",
+  },
+];
