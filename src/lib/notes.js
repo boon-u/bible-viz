@@ -38,6 +38,10 @@ export function normalizeNote(raw) {
     body: raw.body || "",
     tags: Array.isArray(raw.tags) ? raw.tags.filter(Boolean) : [],
     refs,
+    annotationId: raw.annotationId ?? raw.annotation_id ?? null,
+    linkedNotes: Array.isArray(raw.linkedNotes ?? raw.linked_notes)
+      ? (raw.linkedNotes ?? raw.linked_notes)
+      : [],
     source: raw.source ?? null,
     createdAt,
     updatedAt: raw.updatedAt ?? raw.updated_at ?? createdAt,
@@ -122,6 +126,8 @@ function noteToRow(note, profileId) {
     title: note.title,
     body: note.body,
     tags: note.tags,
+    annotation_id: note.annotationId ?? null,
+    linked_notes: note.linkedNotes ?? [],
     source: note.source,
     created_at: note.createdAt,
     updated_at: note.updatedAt,
@@ -157,6 +163,8 @@ function noteFromRows(row, refRows) {
       verseEnd: r.verse_end,
       label: r.label,
     })),
+    annotationId: row.annotation_id ?? null,
+    linkedNotes: row.linked_notes ?? [],
     source: row.source,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

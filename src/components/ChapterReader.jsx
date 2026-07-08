@@ -3,26 +3,31 @@ import { BIBLE, OT_COUNT, bookByName } from "../data/bibleMeta";
 import { getChapter, WEB_CREDIT } from "../lib/bibleText";
 import { bookVerseMap } from "../lib/aggregate";
 import { noteMarksForBook } from "../lib/notes";
-import { highlightsByVerse } from "../lib/annotations";
-import { HIGHLIGHT_COLORS, segmentVerse, selectionToHighlights } from "../lib/highlight";
+import { highlightsForChapter, highlightCoversPoint } from "../lib/annotations";
 import {
-  expandRangeToReads,
-  formatRangeLabel,
-  normalizeRange,
-} from "../lib/readRange";
+  blendFill,
+  fillIntervalsForVerse,
+  offsetInContainer,
+  segmentVerseFill,
+  selectionToRanges,
+} from "../lib/highlight";
+import { expandRangeToReads } from "../lib/readRange";
 import { todayISO } from "../lib/store";
+import ScribbleOverlay from "./ScribbleOverlay";
+import SelectionPopover from "./SelectionPopover";
+import HighlightSessions from "./HighlightSessions";
+import NotesPanel from "./NotesPanel";
+import NoteEditor from "./NoteEditor";
 
-const markBg = (color) => `color-mix(in srgb, ${color} 42%, transparent)`;
-
-// Reading surface: renders WEB chapters, tints already-read verses, logs reads,
-// highlights (verse or word/phrase), and pins margin notes next to the Word.
+// Reader with a paper-Bible annotation model: turn Annotate on, select text to
+// highlight (Fill or hand-drawn Scribble), click a highlight to manage its
+// sessions + titled notes. Highlighting auto-logs the read. Layout never shifts.
 export default function ChapterReader({
   bookName,
   chapter,
   store,
   notesStore,
   annoStore,
-  onOpenNote,
   onChangeLocation,
 }) {
   const { reads, addReads } = store;
@@ -32,17 +37,18 @@ export default function ChapterReader({
   const articleRef = useRef();
   const [chapters, setChapters] = useState([chapter]);
   const [verseMap, setVerseMap] = useState({});
-  const [range, setRange] = useState(null);
-  const [saved, setSaved] = useState(null);
-  const [hlColor, setHlColor] = useState(null); // armed highlighter color
-  const [noteMode, setNoteMode] = useState(false); // tap a verse → note editor
-  const [editing, setEditing] = useState(null); // { chapter, verse, id?, body }
+  const [annotate, setAnnotate] = useState(false);
+  const [penStyle, setPenStyle] = useState("fill");
+  const [pending, setPending] = useState(null); // { ranges, pos }
+  const [sessions, setSessions] = useState(null); // { pos, ids }
+  const [editing, setEditing] = useState(null); // note editor state
+  const [expanded, setExpanded] = useState(() => new Set());
   const date = todayISO();
 
   useEffect(() => {
     setChapters([chapter]);
-    setRange(null);
-    setSaved(null);
+    setPending(null);
+    setSessions(null);
     setEditing(null);
   }, [bookName, chapter]);
 
@@ -61,148 +67,181 @@ export default function ChapterReader({
 
   const counts = useMemo(() => bookVerseMap(reads, bookName), [reads, bookName]);
   const noteMarks = useMemo(() => noteMarksForBook(notes, bookName), [notes, bookName]);
-  const hlByChapter = useMemo(() => {
+
+  const highlightsByCh = useMemo(() => {
     const m = {};
-    for (const ch of chapters) m[ch] = highlightsByVerse(annotations, bookName, ch);
+    for (const ch of chapters) m[ch] = highlightsForChapter(annotations, bookName, ch);
     return m;
   }, [annotations, bookName, chapters]);
 
-  // Verse-anchored notes for the chapters on screen, ordered.
-  const marginNotes = useMemo(() => {
+  const scribbles = useMemo(
+    () =>
+      chapters.flatMap((ch) =>
+        (highlightsByCh[ch] ?? [])
+          .filter((h) => h.style === "scribble")
+          .map((h) => ({ id: h.id, chapter: ch, anchor: h.anchor, color: h.color })),
+      ),
+    [chapters, highlightsByCh],
+  );
+  const overlayRevision = `${chapters.join(",")}|${scribbles.length}|${Object.keys(verseMap).length}|${annotate}`;
+
+  const pageNotes = useMemo(() => {
     const shown = new Set(chapters);
     return notes
       .filter((n) => n.book === bookName && shown.has(n.chapter) && n.verseStart != null)
       .sort((a, b) => a.chapter - b.chapter || a.verseStart - b.verseStart);
   }, [notes, bookName, chapters]);
 
-  const norm = range
-    ? normalizeRange(
-        range.complete
-          ? range
-          : { ...range, endChapter: range.startChapter, endVerse: range.startVerse },
-      )
-    : null;
-
-  const inSel = (ch, v) => {
-    if (!norm) return false;
-    const afterStart = ch > norm.startChapter || (ch === norm.startChapter && v >= norm.startVerse);
-    const beforeEnd = ch < norm.endChapter || (ch === norm.endChapter && v <= norm.endVerse);
-    return afterStart && beforeEnd;
-  };
-
-  const tapVerse = (ch, v) => {
-    setSaved(null);
-    if (!range || range.complete) {
-      setRange({ startChapter: ch, startVerse: v, endChapter: ch, endVerse: v, complete: false });
-    } else {
-      setRange({
-        startChapter: range.startChapter,
-        startVerse: range.startVerse,
-        endChapter: ch,
-        endVerse: v,
-        complete: true,
-      });
-    }
-  };
-
-  const toggleVerseHighlight = (ch, v) => {
-    const text = verseMap[ch]?.[v - 1]?.text ?? "";
-    const existing = annotations.find(
-      (a) =>
-        a.kind === "highlight" &&
-        a.book === bookName &&
-        a.chapter === ch &&
-        a.anchor?.verse === v &&
-        (a.anchor?.start ?? 0) === 0 &&
-        (a.anchor?.end ?? 0) >= text.length,
-    );
-    if (existing) deleteAnnotation(existing.id);
-    else
-      addAnnotation({
-        book: bookName,
-        chapter: ch,
-        kind: "highlight",
-        color: hlColor,
-        anchor: { verse: v, start: 0, end: text.length },
-      });
-  };
-
-  const openNoteEditor = (ch, v) => {
-    const existing = notes.find(
-      (n) => n.book === bookName && n.chapter === ch && n.verseStart === v && n.verseEnd === v,
-    );
-    setEditing({ chapter: ch, verse: v, id: existing?.id, body: existing?.body ?? "" });
-  };
-
-  const onVnum = (ch, v) => {
-    if (noteMode) openNoteEditor(ch, v);
-    else if (hlColor) toggleVerseHighlight(ch, v);
-    else tapVerse(ch, v);
+  // --- highlight creation from a selection --------------------------------
+  const showPopoverForSelection = () => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !articleRef.current) return;
+    const ranges = selectionToRanges(sel, articleRef.current.querySelectorAll(".rd-vtext"));
+    if (!ranges.length) return;
+    const rect = sel.getRangeAt(0).getBoundingClientRect();
+    setPending({ ranges, pos: { x: Math.max(rect.left, 12), y: rect.bottom + 8 } });
+    setSessions(null);
   };
 
   const onMouseUp = () => {
-    if (!hlColor || !articleRef.current) return;
-    const sel = window.getSelection();
-    const verseEls = articleRef.current.querySelectorAll(".rd-vtext");
-    const hls = selectionToHighlights(sel, verseEls);
-    if (!hls.length) return;
-    for (const h of hls) {
-      addAnnotation({
-        book: bookName,
-        chapter: h.chapter,
-        kind: "highlight",
-        color: hlColor,
-        anchor: { verse: h.verse, start: h.start, end: h.end },
-      });
-    }
-    sel.removeAllRanges();
+    if (!annotate) return;
+    showPopoverForSelection();
   };
 
-  const saveNote = () => {
-    const body = editing.body.trim();
-    if (!body) return;
+  const createHighlights = (color) => {
+    if (!pending) return;
+    for (const r of pending.ranges) {
+      addAnnotation({
+        book: bookName,
+        chapter: r.chapter,
+        kind: "highlight",
+        color,
+        style: penStyle,
+        anchor: {
+          startVerse: r.startVerse,
+          startOffset: r.startOffset,
+          endVerse: r.endVerse,
+          endOffset: r.endOffset,
+        },
+      });
+      // highlighting something means you read it → log it
+      addReads(
+        expandRangeToReads({
+          book: bookName,
+          startChapter: r.chapter,
+          startVerse: r.startVerse,
+          endChapter: r.chapter,
+          endVerse: r.endVerse,
+          date,
+        }),
+      );
+    }
+    window.getSelection()?.removeAllRanges();
+    setPending(null);
+  };
+
+  const selectVerse = (ch, v) => {
+    const el = articleRef.current?.querySelector(`.rd-vtext[data-ch="${ch}"][data-v="${v}"]`);
+    if (!el) return;
+    const r = document.createRange();
+    r.selectNodeContents(el);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(r);
+    showPopoverForSelection();
+  };
+
+  const onVnum = (ch, v) => {
+    if (annotate) selectVerse(ch, v);
+  };
+
+  // --- click a highlight → sessions popover -------------------------------
+  const caretToPoint = (x, y) => {
+    const range = document.caretRangeFromPoint?.(x, y);
+    if (!range) return null;
+    const base = range.startContainer.nodeType === 3 ? range.startContainer.parentElement : range.startContainer;
+    const vtext = base?.closest?.(".rd-vtext");
+    if (!vtext) return null;
+    return {
+      chapter: Number(vtext.dataset.ch),
+      verse: Number(vtext.dataset.v),
+      offset: offsetInContainer(vtext, range.startContainer, range.startOffset),
+    };
+  };
+
+  const onArticleClick = (e) => {
+    if (pending) return;
+    const sel = window.getSelection();
+    if (sel && !sel.isCollapsed) return; // this was a selection, not a click
+    const pt = caretToPoint(e.clientX, e.clientY);
+    if (!pt) return;
+    const hits = (highlightsByCh[pt.chapter] ?? []).filter((h) =>
+      highlightCoversPoint(h, pt.verse, pt.offset),
+    );
+    if (hits.length) setSessions({ pos: { x: Math.min(e.clientX, window.innerWidth - 300), y: e.clientY + 6 }, ids: hits.map((h) => h.id) });
+  };
+
+  // --- notes --------------------------------------------------------------
+  const notesFor = (annId) => notes.filter((n) => n.annotationId === annId);
+
+  const openAddNote = (anno) => {
+    setEditing({
+      chapter: anno.chapter,
+      verse: anno.anchor.startVerse,
+      verseEnd: anno.anchor.endVerse,
+      annotationId: anno.id,
+      ref: `${bookName} ${anno.chapter}:${anno.anchor.startVerse}`,
+      title: "",
+      body: "",
+    });
+    setSessions(null);
+  };
+
+  const openEditNote = (n) => {
+    setEditing({
+      id: n.id,
+      chapter: n.chapter,
+      verse: n.verseStart,
+      verseEnd: n.verseEnd,
+      annotationId: n.annotationId,
+      ref: `${bookName} ${n.chapter}:${n.verseStart}`,
+      title: n.title,
+      body: n.body,
+    });
+    setSessions(null);
+  };
+
+  const saveNote = ({ title, body }) => {
     if (editing.id) {
-      notesStore.updateNote(editing.id, { body });
+      notesStore.updateNote(editing.id, { title, body });
     } else {
       notesStore.addNote({
         book: bookName,
         chapter: editing.chapter,
         verseStart: editing.verse,
-        verseEnd: editing.verse,
+        verseEnd: editing.verseEnd ?? editing.verse,
         category: "general",
-        title: `${bookName} ${editing.chapter}:${editing.verse}`,
+        title,
         body,
+        annotationId: editing.annotationId ?? null,
         source: "reader",
       });
     }
     setEditing(null);
   };
 
-  const logRead = () => {
-    if (!range) return;
-    const n = normalizeRange(
-      range.complete
-        ? range
-        : { ...range, endChapter: range.startChapter, endVerse: range.startVerse },
-    );
-    addReads(expandRangeToReads({ book: bookName, ...n, date }));
-    setSaved(formatRangeLabel({ book: bookName, ...n }));
-    setRange(null);
+  const openNoteLink = (id) => {
+    setExpanded((s) => new Set(s).add(id));
+    setTimeout(() => document.getElementById(`panel-note-${id}`)?.scrollIntoView({ block: "center", behavior: "smooth" }), 30);
+  };
+  const openRef = (ref) => {
+    if (ref?.book) onChangeLocation(ref.book, ref.chapter ?? 1);
   };
 
   const lastCh = chapters[chapters.length - 1];
   const canPrev = chapters[0] > 1;
   const canNext = lastCh < book.chapters.length;
   const goto = (ch) => onChangeLocation(bookName, ch);
-
-  const armHl = (value) => {
-    setHlColor((c) => (c === value ? null : value));
-    setNoteMode(false);
-  };
-  const toggleNoteMode = () => {
-    setNoteMode((m) => !m);
-    setHlColor(null);
-  };
 
   return (
     <main className="page reader">
@@ -224,47 +263,48 @@ export default function ChapterReader({
             <option key={i + 1} value={i + 1}>Chapter {i + 1}</option>
           ))}
         </select>
-        <button className="ghost-btn" disabled={!canPrev} onClick={() => goto(chapters[0] - 1)}>
-          ← Prev
-        </button>
-        <button className="ghost-btn" disabled={!canNext} onClick={() => goto(lastCh + 1)}>
-          Next →
-        </button>
+        <button className="ghost-btn" disabled={!canPrev} onClick={() => goto(chapters[0] - 1)}>← Prev</button>
+        <button className="ghost-btn" disabled={!canNext} onClick={() => goto(lastCh + 1)}>Next →</button>
+
+        <div className="reader-pen">
+          <button
+            className={`pen-toggle${annotate ? " on" : ""}`}
+            onClick={() => {
+              setAnnotate((a) => !a);
+              setPending(null);
+              setSessions(null);
+            }}
+          >
+            {annotate ? "✎ Annotating" : "✎ Annotate"}
+          </button>
+          {annotate && (
+            <div className="pen-styles">
+              <button className={penStyle === "fill" ? "active" : ""} onClick={() => setPenStyle("fill")}>▬ Fill</button>
+              <button className={penStyle === "scribble" ? "active" : ""} onClick={() => setPenStyle("scribble")}>◯ Scribble</button>
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="hl-toolbar">
-        <span className="hl-label">Highlighter</span>
-        {HIGHLIGHT_COLORS.map((c) => (
-          <button
-            key={c.name}
-            className={`hl-swatch${hlColor === c.value ? " active" : ""}`}
-            style={{ background: c.value }}
-            title={c.name}
-            onClick={() => armHl(c.value)}
-          />
-        ))}
-        <button className={`note-mode-btn${noteMode ? " active" : ""}`} onClick={toggleNoteMode}>
-          ✎ Note
-        </button>
-        <span className="hl-hint">
-          {noteMode
-            ? "tap a verse number to add or edit its note"
-            : hlColor
-              ? "select text or tap a verse number to highlight · tap a highlight to remove"
-              : "tap a verse number to select & log a read"}
-        </span>
-      </div>
+      {annotate && (
+        <p className="reader-hint">
+          Select any words or a verse (or tap a verse number) to highlight. Click a highlight to add a note or remove it.
+        </p>
+      )}
 
       <div className="reader-body">
-        <article className="reader-text" ref={articleRef} onMouseUp={onMouseUp}>
+        <article
+          className="reader-text"
+          ref={articleRef}
+          onMouseUp={onMouseUp}
+          onClick={onArticleClick}
+        >
           {chapters.map((ch) => {
             const verses = verseMap[ch];
-            const hlMap = hlByChapter[ch];
+            const fillHls = (highlightsByCh[ch] ?? []).filter((h) => h.style !== "scribble");
             return (
               <section key={ch} className="rd-chapter" data-ch={ch}>
-                <h2 className="rd-chapter-head">
-                  {bookName} {ch}
-                </h2>
+                <h2 className="rd-chapter-head">{bookName} {ch}</h2>
                 {!verses ? (
                   <p className="rd-loading">Loading…</p>
                 ) : verses.length === 0 ? (
@@ -274,16 +314,12 @@ export default function ChapterReader({
                     {verses.map(({ verse, text }) => {
                       const readCount = counts.get(`${ch}:${verse}`)?.count ?? 0;
                       const hasNote = (noteMarks.get(`${ch}:${verse}`) ?? 0) > 0;
-                      const sel = inSel(ch, verse);
-                      const segs = segmentVerse(text, hlMap?.get(verse));
+                      const intervals = fillIntervalsForVerse(fillHls, verse, text.length);
+                      const segs = segmentVerseFill(text, intervals);
                       return (
-                        <span
-                          key={verse}
-                          className={`rd-verse${readCount > 0 ? " read" : ""}${sel ? " sel" : ""}`}
-                        >
+                        <span key={verse} className={`rd-verse${readCount > 0 ? " read" : ""}`}>
                           <sup
-                            className="rd-vnum"
-                            title={readCount > 0 ? `read ${readCount}×` : "tap to select"}
+                            className={`rd-vnum${annotate ? " annot" : ""}`}
                             onClick={() => onVnum(ch, verse)}
                           >
                             {verse}
@@ -291,17 +327,11 @@ export default function ChapterReader({
                           </sup>
                           <span className="rd-vtext" data-ch={ch} data-v={verse}>
                             {segs.map((seg, i) =>
-                              seg.hl ? (
+                              seg.hls ? (
                                 <mark
                                   key={i}
                                   className="rd-hl"
-                                  style={{ background: markBg(seg.hl.color) }}
-                                  onClick={(e) => {
-                                    if (hlColor) {
-                                      e.stopPropagation();
-                                      deleteAnnotation(seg.hl.id);
-                                    }
-                                  }}
+                                  style={{ background: blendFill(seg.hls.map((h) => h.color)) }}
                                 >
                                   {seg.text}
                                 </mark>
@@ -318,27 +348,25 @@ export default function ChapterReader({
               </section>
             );
           })}
+          <ScribbleOverlay containerRef={articleRef} scribbles={scribbles} revision={overlayRevision} />
         </article>
 
-        {marginNotes.length > 0 && (
-          <aside className="reader-margin">
-            {marginNotes.map((n) => (
-              <div key={n.id} className="margin-note">
-                <div className="margin-note-ref">
-                  {n.chapter}:{n.verseStart}
-                  {n.verseEnd !== n.verseStart ? `–${n.verseEnd}` : ""}
-                </div>
-                <div className="margin-note-body">{n.body}</div>
-                <div className="margin-note-actions">
-                  <button onClick={() => setEditing({ chapter: n.chapter, verse: n.verseStart, id: n.id, body: n.body })}>
-                    edit
-                  </button>
-                  <button onClick={() => onOpenNote?.(n.id)}>open</button>
-                </div>
-              </div>
-            ))}
-          </aside>
-        )}
+        <NotesPanel
+          notes={pageNotes}
+          expanded={expanded}
+          onToggle={(id) =>
+            setExpanded((s) => {
+              const n = new Set(s);
+              n.has(id) ? n.delete(id) : n.add(id);
+              return n;
+            })
+          }
+          onExpandAll={() => setExpanded(new Set(pageNotes.map((n) => n.id)))}
+          onCollapseAll={() => setExpanded(new Set())}
+          onEdit={openEditNote}
+          onOpenNoteLink={openNoteLink}
+          onOpenRef={openRef}
+        />
       </div>
 
       <div className="reader-foot">
@@ -350,54 +378,55 @@ export default function ChapterReader({
         <span className="reader-credit">{WEB_CREDIT}</span>
       </div>
 
-      {editing && (
-        <div className="note-editor-overlay" onClick={() => setEditing(null)}>
-          <div className="note-editor" onClick={(e) => e.stopPropagation()}>
-            <div className="note-editor-head">
-              Note on {bookName} {editing.chapter}:{editing.verse}
-            </div>
-            <textarea
-              className="note-editor-text"
-              autoFocus
-              value={editing.body}
-              placeholder="Write your note (Markdown supported)…"
-              onChange={(e) => setEditing((ed) => ({ ...ed, body: e.target.value }))}
-            />
-            <div className="note-editor-actions">
-              {editing.id && (
-                <button
-                  className="delete-btn"
-                  onClick={() => {
-                    notesStore.deleteNote(editing.id);
-                    setEditing(null);
-                  }}
-                >
-                  Delete
-                </button>
-              )}
-              <button className="ghost-btn" onClick={() => setEditing(null)}>Cancel</button>
-              <button className="primary-btn" onClick={saveNote}>Save note</button>
-            </div>
-          </div>
-        </div>
+      {pending && (
+        <SelectionPopover
+          pos={pending.pos}
+          style={penStyle}
+          onStyle={setPenStyle}
+          onPick={createHighlights}
+          onClose={() => {
+            window.getSelection()?.removeAllRanges();
+            setPending(null);
+          }}
+        />
       )}
 
-      {(range || saved) && (
-        <div className="reader-actionbar">
-          <span className="reader-sel-label">
-            {saved
-              ? `Logged ${saved} ✓`
-              : norm
-                ? formatRangeLabel({ book: bookName, ...norm }) + (range.complete ? "" : " …")
-                : ""}
-          </span>
-          {range && (
-            <>
-              <button className="ghost-btn" onClick={() => setRange(null)}>Clear</button>
-              <button className="primary-btn" onClick={logRead}>Log read</button>
-            </>
-          )}
-        </div>
+      {sessions && (
+        <HighlightSessions
+          pos={sessions.pos}
+          sessions={sessions.ids
+            .map((id) => annotations.find((a) => a.id === id))
+            .filter(Boolean)}
+          notesFor={notesFor}
+          annotate={annotate}
+          onDeleteHighlight={(id) => {
+            deleteAnnotation(id);
+            setSessions((s) => {
+              const ids = s.ids.filter((x) => x !== id);
+              return ids.length ? { ...s, ids } : null;
+            });
+          }}
+          onAddNote={openAddNote}
+          onOpenNote={openEditNote}
+          onClose={() => setSessions(null)}
+        />
+      )}
+
+      {editing && (
+        <NoteEditor
+          initial={editing}
+          notesForLinks={notes.filter((n) => n.id !== editing.id)}
+          onSave={saveNote}
+          onCancel={() => setEditing(null)}
+          onDelete={
+            editing.id
+              ? () => {
+                  notesStore.deleteNote(editing.id);
+                  setEditing(null);
+                }
+              : undefined
+          }
+        />
       )}
     </main>
   );

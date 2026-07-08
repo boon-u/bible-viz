@@ -32,7 +32,8 @@ function fromRow(r) {
     chapter: r.chapter,
     kind: r.kind,
     color: r.color,
-    anchor: r.anchor,
+    style: r.style ?? "fill",
+    anchor: normalizeAnchor(r.anchor),
     geometry: r.geometry,
     text: r.text,
     transcription: r.transcription,
@@ -48,6 +49,7 @@ function toRow(a, profileId) {
     chapter: a.chapter,
     kind: a.kind,
     color: a.color ?? null,
+    style: a.style ?? "fill",
     anchor: a.anchor ?? null,
     geometry: a.geometry ?? null,
     text: a.text ?? null,
@@ -55,6 +57,21 @@ function toRow(a, profileId) {
     created_at: a.createdAt,
     updated_at: a.updatedAt,
   };
+}
+
+// Accept both the new range anchor and the legacy {verse,start,end} shape.
+function normalizeAnchor(anchor) {
+  if (!anchor) return anchor;
+  if (anchor.startVerse != null) return anchor;
+  if (anchor.verse != null) {
+    return {
+      startVerse: anchor.verse,
+      startOffset: anchor.start ?? 0,
+      endVerse: anchor.verse,
+      endOffset: anchor.end ?? 0,
+    };
+  }
+  return anchor;
 }
 
 function make(input) {
@@ -65,7 +82,8 @@ function make(input) {
     chapter: input.chapter,
     kind: input.kind,
     color: input.color ?? null,
-    anchor: input.anchor ?? null,
+    style: input.style ?? "fill",
+    anchor: normalizeAnchor(input.anchor) ?? null,
     geometry: input.geometry ?? null,
     text: input.text ?? null,
     transcription: input.transcription ?? null,
@@ -96,7 +114,9 @@ export function useAnnotations({ supabase, profileId } = {}) {
           setAnnotations(data.map(fromRow));
         }
       } else if (alive) {
-        setAnnotations(readLocal());
+        setAnnotations(
+          readLocal().map((a) => ({ ...a, style: a.style ?? "fill", anchor: normalizeAnchor(a.anchor) })),
+        );
       }
       if (alive) setReady(true);
     }
@@ -169,16 +189,18 @@ export function useAnnotations({ supabase, profileId } = {}) {
   return { annotations, ready, cloud, addAnnotation, updateAnnotation, deleteAnnotation, exportAnnotations };
 }
 
-// Highlights for one chapter, grouped by verse → [{start,end,color,id}] sorted.
-export function highlightsByVerse(annotations, book, chapter) {
-  const map = new Map();
-  for (const a of annotations) {
-    if (a.kind !== "highlight" || a.book !== book || a.chapter !== chapter) continue;
-    const v = a.anchor?.verse;
-    if (v == null) continue;
-    if (!map.has(v)) map.set(v, []);
-    map.get(v).push({ id: a.id, start: a.anchor.start ?? 0, end: a.anchor.end ?? 0, color: a.color });
-  }
-  for (const list of map.values()) list.sort((x, y) => x.start - y.start);
-  return map;
+// All highlight annotations for one chapter (range-based, both styles).
+export function highlightsForChapter(annotations, book, chapter) {
+  return annotations.filter(
+    (a) => a.kind === "highlight" && a.book === book && a.chapter === chapter && a.anchor?.startVerse != null,
+  );
+}
+
+// Does a highlight's range cover (verse, offset)? Used for click hit-testing.
+export function highlightCoversPoint(a, verse, offset) {
+  const an = a.anchor;
+  if (!an) return false;
+  const afterStart = verse > an.startVerse || (verse === an.startVerse && offset >= an.startOffset);
+  const beforeEnd = verse < an.endVerse || (verse === an.endVerse && offset <= an.endOffset);
+  return afterStart && beforeEnd;
 }
