@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BIBLE, OT_COUNT, bookByName } from "../data/bibleMeta";
 import { getChapter, WEB_CREDIT } from "../lib/bibleText";
 import { bookVerseMap } from "../lib/aggregate";
 import { noteMarksForBook } from "../lib/notes";
+import { highlightsByVerse } from "../lib/annotations";
+import { HIGHLIGHT_COLORS, segmentVerse, selectionToHighlights } from "../lib/highlight";
 import {
   expandRangeToReads,
   formatRangeLabel,
@@ -10,26 +12,29 @@ import {
 } from "../lib/readRange";
 import { todayISO } from "../lib/store";
 
-// Stage 1 reading surface: renders WEB chapters as flowing verses, tints verses
-// you've already read, and lets you select a verse range and log it — reusing the
-// same read-range helpers as LogRead. Multiple chapters can be shown at once.
-export default function ChapterReader({ bookName, chapter, store, notes = [], onChangeLocation }) {
+const markBg = (color) => `color-mix(in srgb, ${color} 42%, transparent)`;
+
+// Reading surface: renders WEB chapters, tints already-read verses, lets you
+// select a verse range and log it, and — with the highlighter armed — highlight
+// verse groups or word/phrase spans.
+export default function ChapterReader({ bookName, chapter, store, notes = [], annoStore, onChangeLocation }) {
   const { reads, addReads } = store;
+  const { annotations, addAnnotation, deleteAnnotation } = annoStore;
   const book = bookByName(bookName);
+  const articleRef = useRef();
   const [chapters, setChapters] = useState([chapter]);
   const [verseMap, setVerseMap] = useState({}); // chNum -> [{verse,text}]
-  const [range, setRange] = useState(null); // {startChapter,startVerse,endChapter,endVerse,complete}
+  const [range, setRange] = useState(null);
   const [saved, setSaved] = useState(null);
+  const [hlColor, setHlColor] = useState(null); // null = read mode; else armed color
   const date = todayISO();
 
-  // Reset when navigating to a new location.
   useEffect(() => {
     setChapters([chapter]);
     setRange(null);
     setSaved(null);
   }, [bookName, chapter]);
 
-  // Load any displayed chapter whose text isn't cached yet.
   useEffect(() => {
     let alive = true;
     for (const ch of chapters) {
@@ -45,6 +50,11 @@ export default function ChapterReader({ bookName, chapter, store, notes = [], on
 
   const counts = useMemo(() => bookVerseMap(reads, bookName), [reads, bookName]);
   const noteMarks = useMemo(() => noteMarksForBook(notes, bookName), [notes, bookName]);
+  const hlByChapter = useMemo(() => {
+    const m = {};
+    for (const ch of chapters) m[ch] = highlightsByVerse(annotations, bookName, ch);
+    return m;
+  }, [annotations, bookName, chapters]);
 
   const norm = range
     ? normalizeRange(
@@ -74,6 +84,49 @@ export default function ChapterReader({ bookName, chapter, store, notes = [], on
         complete: true,
       });
     }
+  };
+
+  const toggleVerseHighlight = (ch, v) => {
+    const text = verseMap[ch]?.[v - 1]?.text ?? "";
+    const existing = annotations.find(
+      (a) =>
+        a.kind === "highlight" &&
+        a.book === bookName &&
+        a.chapter === ch &&
+        a.anchor?.verse === v &&
+        (a.anchor?.start ?? 0) === 0 &&
+        (a.anchor?.end ?? 0) >= text.length,
+    );
+    if (existing) deleteAnnotation(existing.id);
+    else
+      addAnnotation({
+        book: bookName,
+        chapter: ch,
+        kind: "highlight",
+        color: hlColor,
+        anchor: { verse: v, start: 0, end: text.length },
+      });
+  };
+
+  const onVnum = (ch, v) => (hlColor ? toggleVerseHighlight(ch, v) : tapVerse(ch, v));
+
+  // Highlighter armed + a text selection → create word/phrase highlights.
+  const onMouseUp = () => {
+    if (!hlColor || !articleRef.current) return;
+    const sel = window.getSelection();
+    const verseEls = articleRef.current.querySelectorAll(".rd-vtext");
+    const hls = selectionToHighlights(sel, verseEls);
+    if (!hls.length) return;
+    for (const h of hls) {
+      addAnnotation({
+        book: bookName,
+        chapter: h.chapter,
+        kind: "highlight",
+        color: hlColor,
+        anchor: { verse: h.verse, start: h.start, end: h.end },
+      });
+    }
+    sel.removeAllRanges();
   };
 
   const logRead = () => {
@@ -121,13 +174,28 @@ export default function ChapterReader({ bookName, chapter, store, notes = [], on
         </button>
       </div>
 
-      <p className="reader-hint">
-        Tap a verse number to start a selection, tap another to finish, then log the read.
-      </p>
+      <div className="hl-toolbar">
+        <span className="hl-label">Highlighter</span>
+        {HIGHLIGHT_COLORS.map((c) => (
+          <button
+            key={c.name}
+            className={`hl-swatch${hlColor === c.value ? " active" : ""}`}
+            style={{ background: c.value }}
+            title={c.name}
+            onClick={() => setHlColor(hlColor === c.value ? null : c.value)}
+          />
+        ))}
+        <span className="hl-hint">
+          {hlColor
+            ? "select text or tap a verse number to highlight · tap a highlight to remove"
+            : "tap a verse number to select & log a read"}
+        </span>
+      </div>
 
-      <article className="reader-text">
+      <article className="reader-text" ref={articleRef} onMouseUp={onMouseUp}>
         {chapters.map((ch) => {
           const verses = verseMap[ch];
+          const hlMap = hlByChapter[ch];
           return (
             <section key={ch} className="rd-chapter" data-ch={ch}>
               <h2 className="rd-chapter-head">
@@ -143,22 +211,41 @@ export default function ChapterReader({ bookName, chapter, store, notes = [], on
                     const readCount = counts.get(`${ch}:${verse}`)?.count ?? 0;
                     const hasNote = (noteMarks.get(`${ch}:${verse}`) ?? 0) > 0;
                     const sel = inSel(ch, verse);
+                    const segs = segmentVerse(text, hlMap?.get(verse));
                     return (
                       <span
                         key={verse}
                         className={`rd-verse${readCount > 0 ? " read" : ""}${sel ? " sel" : ""}`}
-                        data-ch={ch}
-                        data-v={verse}
                       >
                         <sup
                           className="rd-vnum"
                           title={readCount > 0 ? `read ${readCount}×` : "tap to select"}
-                          onClick={() => tapVerse(ch, verse)}
+                          onClick={() => onVnum(ch, verse)}
                         >
                           {verse}
                           {hasNote && <span className="rd-note-dot" />}
                         </sup>
-                        {text}{" "}
+                        <span className="rd-vtext" data-ch={ch} data-v={verse}>
+                          {segs.map((seg, i) =>
+                            seg.hl ? (
+                              <mark
+                                key={i}
+                                className="rd-hl"
+                                style={{ background: markBg(seg.hl.color) }}
+                                onClick={(e) => {
+                                  if (hlColor) {
+                                    e.stopPropagation();
+                                    deleteAnnotation(seg.hl.id);
+                                  }
+                                }}
+                              >
+                                {seg.text}
+                              </mark>
+                            ) : (
+                              <span key={i}>{seg.text}</span>
+                            ),
+                          )}
+                        </span>{" "}
                       </span>
                     );
                   })}

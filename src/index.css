@@ -1541,3 +1541,24 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .reader-sel-label { font-size: 14px; font-weight: 600; }
 .reader-actionbar .ghost-btn, .reader-actionbar .primary-btn { margin-top: 0; }
+
+/* Highlighter toolbar + marks (Stage 2) */
+.hl-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 10px 0 2px;
+}
+.hl-label { font-size: 13px; color: var(--muted); font-weight: 600; }
+.hl-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  padding: 0;
+}
+.hl-swatch.active { border-color: var(--text); transform: scale(1.12); box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--text); }
+.hl-hint { font-size: 12px; color: var(--cell-num); }
+.rd-vtext { border-radius: 3px; }
+.rd-hl { color: inherit; border-radius: 3px; padding: 0 1px; cursor: pointer; }

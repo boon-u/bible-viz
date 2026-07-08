@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useReads, readLocalReads } from "./lib/store";
 import { useNotes } from "./lib/notes";
+import { useAnnotations } from "./lib/annotations";
 import { supabase, isSupabaseConfigured } from "./lib/supabase";
 import { useProfiles } from "./lib/profiles";
 import Overview from "./components/Overview";
@@ -33,6 +34,10 @@ export default function App() {
     profileId: profiles.selected?.id,
   });
   const notesStore = useNotes({
+    supabase: isSupabaseConfigured ? supabase : null,
+    profileId: profiles.selected?.id,
+  });
+  const annoStore = useAnnotations({
     supabase: isSupabaseConfigured ? supabase : null,
     profileId: profiles.selected?.id,
   });
@@ -188,6 +193,7 @@ export default function App() {
           chapter={view.chapter}
           store={store}
           notes={notesStore.notes}
+          annoStore={annoStore}
           onChangeLocation={openRead}
         />
       )}
