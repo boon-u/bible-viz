@@ -47,10 +47,25 @@ export function selectionToRanges(sel, verseEls) {
     const len = el.textContent.length;
     const elRange = document.createRange();
     elRange.selectNodeContents(el);
-    const startsBefore = range.compareBoundaryPoints(Range.START_TO_START, elRange) <= 0;
-    const endsAfter = range.compareBoundaryPoints(Range.END_TO_END, elRange) >= 0;
-    const s = startsBefore ? 0 : offsetInContainer(el, range.startContainer, range.startOffset);
-    const e = endsAfter ? len : offsetInContainer(el, range.endContainer, range.endOffset);
+
+    let s;
+    if (range.compareBoundaryPoints(Range.START_TO_START, elRange) <= 0) {
+      s = 0;
+    } else if (range.compareBoundaryPoints(Range.END_TO_START, elRange) >= 0) {
+      s = len;
+    } else {
+      s = offsetInContainer(el, range.startContainer, range.startOffset);
+    }
+
+    let e;
+    if (range.compareBoundaryPoints(Range.END_TO_END, elRange) >= 0) {
+      e = len;
+    } else if (range.compareBoundaryPoints(Range.START_TO_END, elRange) <= 0) {
+      e = 0;
+    } else {
+      e = offsetInContainer(el, range.endContainer, range.endOffset);
+    }
+
     if (e <= s) continue;
     const ch = Number(el.dataset.ch);
     if (!byChapter.has(ch)) byChapter.set(ch, []);

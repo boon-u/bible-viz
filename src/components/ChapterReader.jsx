@@ -323,6 +323,7 @@ export default function ChapterReader({
                             onClick={() => onVnum(ch, verse)}
                           >
                             {verse}
+                            {readCount > 0 && <span className="rd-read-dot" />}
                             {hasNote && <span className="rd-note-dot" />}
                           </sup>
                           <span className="rd-vtext" data-ch={ch} data-v={verse}>

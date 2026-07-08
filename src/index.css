@@ -1490,7 +1490,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   text-align: justify;
 }
 .rd-verse { border-radius: 4px; transition: background 0.12s; }
-.rd-verse.read { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.rd-verse.read { background: none; }
 .rd-verse.sel { background: color-mix(in srgb, var(--accent) 32%, transparent); }
 .rd-vnum {
   font-family: var(--font-sans);
@@ -1504,6 +1504,15 @@ button { font: inherit; color: inherit; cursor: pointer; }
   user-select: none;
 }
 .rd-vnum:hover { text-decoration: underline; }
+.rd-read-dot {
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-left: 1px;
+  vertical-align: middle;
+}
 .rd-note-dot {
   display: inline-block;
   width: 4px;
