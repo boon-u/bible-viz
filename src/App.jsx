@@ -1,10 +1,15 @@
 import { useEffect, useState } from "react";
 import { useReads, readLocalReads } from "./lib/store";
+import { useNotes } from "./lib/notes";
 import { supabase, isSupabaseConfigured } from "./lib/supabase";
 import { useProfiles } from "./lib/profiles";
 import Overview from "./components/Overview";
 import LogRead from "./components/LogRead";
 import BookView from "./components/BookView";
+import NotesBrowser from "./components/NotesBrowser";
+import NoteReader from "./components/NoteReader";
+import GraphView from "./components/GraphView";
+import CommandPalette from "./components/CommandPalette";
 import ProfilePicker from "./components/ProfilePicker";
 import ProfileAvatar from "./components/ProfileAvatar";
 
@@ -26,7 +31,13 @@ export default function App() {
     supabase: isSupabaseConfigured ? supabase : null,
     profileId: profiles.selected?.id,
   });
-  // view: { name: "overview" } | { name: "log" } | { name: "book", book, focus?: {chapter, verse} }
+  const notesStore = useNotes({
+    supabase: isSupabaseConfigured ? supabase : null,
+    profileId: profiles.selected?.id,
+  });
+  // view: { name: "overview" } | { name: "log" } | { name: "notes", tag? }
+  //     | { name: "note", noteId } | { name: "graph" }
+  //     | { name: "book", book, focus?: {chapter, verse} }
   const [view, setView] = useState({ name: "overview" });
   const [theme, setTheme] = useState(initialTheme);
   const [migrateCount, setMigrateCount] = useState(0);
@@ -61,6 +72,16 @@ export default function App() {
   };
 
   const openBook = (book, focus) => setView({ name: "book", book, focus });
+  const openNoteById = (id) => setView({ name: "note", noteId: id });
+  const openTopic = (tag) => setView({ name: "notes", tag });
+
+  // Navigate to a structured Scripture reference: focus the verse when known,
+  // else open the book.
+  const openRef = (ref) => {
+    if (!ref?.book) return;
+    if (ref.chapter && ref.verseStart) openBook(ref.book, { chapter: ref.chapter, verse: ref.verseStart });
+    else openBook(ref.book);
+  };
 
   if (isSupabaseConfigured && profiles.loading) return null;
   if (isSupabaseConfigured && !profiles.selected) {
@@ -76,6 +97,14 @@ export default function App() {
   if (!store.ready) return null;
 
   const profile = profiles.selected;
+  const navItem = (name, label) => (
+    <button
+      className={view.name === name ? "nav-btn active" : "nav-btn"}
+      onClick={() => setView({ name })}
+    >
+      {label}
+    </button>
+  );
 
   return (
     <div className="app">
@@ -84,18 +113,10 @@ export default function App() {
           <span className="brand-mark">✦</span> Bible Viz
         </button>
         <nav>
-          <button
-            className={view.name === "overview" ? "nav-btn active" : "nav-btn"}
-            onClick={() => setView({ name: "overview" })}
-          >
-            Overview
-          </button>
-          <button
-            className={view.name === "log" ? "nav-btn active" : "nav-btn"}
-            onClick={() => setView({ name: "log" })}
-          >
-            + Log a read
-          </button>
+          {navItem("overview", "Overview")}
+          {navItem("notes", "Notes")}
+          {navItem("graph", "Graph")}
+          {navItem("log", "+ Log a read")}
           <button
             className="nav-btn theme-btn"
             title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
@@ -143,16 +164,53 @@ export default function App() {
         </div>
       )}
 
-      {view.name === "overview" && <Overview store={store} onOpenBook={openBook} />}
+      {view.name === "overview" && (
+        <Overview store={store} notesStore={notesStore} profile={profile} onOpenBook={openBook} />
+      )}
       {view.name === "log" && <LogRead store={store} />}
+      {view.name === "notes" && (
+        <NotesBrowser key={view.tag ?? "all"} notes={notesStore.notes} initialTag={view.tag} onOpen={(n) => openNoteById(n.id)} />
+      )}
+      {view.name === "note" && (() => {
+        const note = notesStore.notes.find((n) => n.id === view.noteId);
+        if (!note) return <NotesBrowser notes={notesStore.notes} onOpen={(n) => openNoteById(n.id)} />;
+        return (
+          <NoteReader
+            note={note}
+            reads={store.reads}
+            onOpenRef={openRef}
+            onDelete={notesStore.deleteNote}
+            onBack={() => setView({ name: "notes" })}
+          />
+        );
+      })()}
+      {view.name === "graph" && (
+        <GraphView
+          notes={notesStore.notes}
+          reads={store.reads}
+          theme={theme}
+          onOpenNote={openNoteById}
+          onOpenRef={openRef}
+          onOpenTopic={openTopic}
+        />
+      )}
       {view.name === "book" && (
         <BookView
           bookName={view.book}
           focus={view.focus}
           store={store}
+          notes={notesStore.notes}
+          onOpenNote={(n) => openNoteById(n.id)}
           onBack={() => setView({ name: "overview" })}
         />
       )}
+
+      <CommandPalette
+        notes={notesStore.notes}
+        onOpenNote={openNoteById}
+        onOpenRef={openRef}
+        onOpenTopic={openTopic}
+      />
     </div>
   );
 }

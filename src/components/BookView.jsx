@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { bookByName } from "../data/bibleMeta";
 import { bookVerseMap } from "../lib/aggregate";
+import { noteMarksForBook, notesForVerse } from "../lib/notes";
 import { fmtDate, refLabel, todayISO } from "../lib/store";
 import ReadEntryRow from "./ReadEntryRow";
 
@@ -9,12 +10,21 @@ const TIERS = ["var(--cell-unread)", "#3b82f6", "#22c55e", "#a3e635", "#facc15",
 const TIER_LABELS = ["unread", "1×", "2×", "3×", "4×", "5×", "6×+"];
 const tierColor = (count) => TIERS[Math.min(count, TIERS.length - 1)];
 
-export default function BookView({ bookName, focus, store, onBack }) {
+export default function BookView({ bookName, focus, store, notes = [], onOpenNote, onBack }) {
   const { reads, addRead, deleteRead } = store;
   const book = bookByName(bookName);
   const counts = useMemo(() => bookVerseMap(reads, bookName), [reads, bookName]);
+  const noteMarks = useMemo(() => noteMarksForBook(notes, bookName), [notes, bookName]);
   const [selected, setSelected] = useState(focus ?? null);
   const gridRef = useRef();
+
+  const selNotes = useMemo(
+    () =>
+      selected
+        ? notesForVerse(notes, { book: bookName, chapter: selected.chapter, verse: selected.verse })
+        : { anchored: [], referencing: [] },
+    [notes, bookName, selected],
+  );
 
   useEffect(() => {
     if (!focus || !gridRef.current) return;
@@ -69,18 +79,20 @@ export default function BookView({ bookName, focus, store, onBack }) {
               <div className="hm-cells">
                 {Array.from({ length: verseCount }, (_, i) => i + 1).map((v) => {
                   const count = counts.get(`${ch}:${v}`)?.count ?? 0;
+                  const noteCount = noteMarks.get(`${ch}:${v}`) ?? 0;
                   const isSel = selected?.chapter === ch && selected?.verse === v;
                   return (
                     <button
                       key={v}
-                      className={`hm-cell${count > 0 ? " lit" : ""}${isSel ? " selected" : ""}`}
+                      className={`hm-cell${count > 0 ? " lit" : ""}${isSel ? " selected" : ""}${noteCount > 0 ? " has-note" : ""}`}
                       data-ch={ch}
                       data-v={v}
                       style={{ background: tierColor(count) }}
-                      title={`${bookName} ${ch}:${v} — ${count === 0 ? "unread" : `read ${count}×`}`}
+                      title={`${bookName} ${ch}:${v} — ${count === 0 ? "unread" : `read ${count}×`}${noteCount > 0 ? ` · ${noteCount} note${noteCount === 1 ? "" : "s"}` : ""}`}
                       onClick={() => setSelected(isSel ? null : { chapter: ch, verse: v })}
                     >
                       {v}
+                      {noteCount > 0 && <span className="hm-note-dot" />}
                     </button>
                   );
                 })}
@@ -116,6 +128,32 @@ export default function BookView({ bookName, focus, store, onBack }) {
               {verseReads.map((r) => (
                 <ReadEntryRow key={r.id} read={r} onDelete={deleteRead} />
               ))}
+            </div>
+          )}
+          {(selNotes.anchored.length > 0 || selNotes.referencing.length > 0) && (
+            <div className="verse-notes">
+              {selNotes.anchored.length > 0 && (
+                <>
+                  <p className="verse-read-log-label">Notes on this verse</p>
+                  {selNotes.anchored.map((n) => (
+                    <button key={n.id} className="verse-note-link" onClick={() => onOpenNote?.(n)}>
+                      <span className={`note-cat cat-${n.category}`}>{n.category}</span>
+                      {n.title}
+                    </button>
+                  ))}
+                </>
+              )}
+              {selNotes.referencing.length > 0 && (
+                <>
+                  <p className="verse-read-log-label">Notes referencing this verse</p>
+                  {selNotes.referencing.map((n) => (
+                    <button key={n.id} className="verse-note-link" onClick={() => onOpenNote?.(n)}>
+                      <span className={`note-cat cat-${n.category}`}>{n.category}</span>
+                      {n.title}
+                    </button>
+                  ))}
+                </>
+              )}
             </div>
           )}
           <button
