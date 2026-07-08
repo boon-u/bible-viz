@@ -13,6 +13,8 @@ import {
 } from "../lib/highlight";
 import { expandRangeToReads } from "../lib/readRange";
 import { chapterFlow, isPoetryBook } from "../lib/bibleLayout";
+import { verseKey, verseKeysWithNotes } from "../lib/noteVerseLink";
+import { useVerseAnchors } from "../lib/useVerseAnchors";
 import { todayISO } from "../lib/store";
 import ScribbleOverlay from "./ScribbleOverlay";
 import SelectionPopover from "./SelectionPopover";
@@ -42,6 +44,7 @@ export default function ChapterReader({
   const [sessions, setSessions] = useState(null);
   const [editing, setEditing] = useState(null);
   const [expanded, setExpanded] = useState(() => new Set());
+  const [focusVerseKey, setFocusVerseKey] = useState(null);
   const date = todayISO();
 
   useEffect(() => {
@@ -49,6 +52,7 @@ export default function ChapterReader({
     setPending(null);
     setSessions(null);
     setEditing(null);
+    setFocusVerseKey(null);
   }, [bookName, chapter]);
 
   useEffect(() => {
@@ -100,6 +104,15 @@ export default function ChapterReader({
       .filter((n) => n.book === bookName && shown.has(n.chapter) && n.verseStart != null)
       .sort((a, b) => a.chapter - b.chapter || a.verseStart - b.verseStart);
   }, [notes, bookName, chapters]);
+
+  const versesWithNotes = useMemo(() => verseKeysWithNotes(pageNotes), [pageNotes]);
+
+  const anchorRevision = `${overlayRevision}|${pageNotes.length}|${expanded.size}|${Object.keys(bookMeta).length}|${focusVerseKey ?? ""}`;
+
+  const { anchors: verseAnchors, height: articleHeight } = useVerseAnchors(
+    articleRef,
+    anchorRevision,
+  );
 
   const showPopoverForSelection = () => {
     const sel = window.getSelection();
@@ -287,6 +300,9 @@ export default function ChapterReader({
     const hasNote = (noteMarks.get(`${ch}:${verse}`) ?? 0) > 0;
     const intervals = fillIntervalsForVerse(fillHls, verse, text.length);
     const segs = segmentVerseDisplay(text, intervals, wjFor(ch, verse));
+    const vKey = verseKey(ch, verse);
+    const linkable = versesWithNotes.has(vKey);
+    const linked = focusVerseKey === vKey;
     return (
       <span className={`rd-verse${readCount > 0 ? " read" : ""}`}>
         {!hideNum && (
@@ -299,7 +315,13 @@ export default function ChapterReader({
             {hasNote && <span className="rd-note-dot" />}
           </sup>
         )}
-        <span className="rd-vtext" data-ch={ch} data-v={verse}>
+        <span
+          className={`rd-vtext${linked ? " rd-vtext--linked" : ""}${linkable ? " rd-vtext--has-notes" : ""}`}
+          data-ch={ch}
+          data-v={verse}
+          onMouseEnter={() => linkable && setFocusVerseKey(vKey)}
+          onMouseLeave={() => focusVerseKey === vKey && setFocusVerseKey(null)}
+        >
           {renderSegments(segs)}
         </span>
       </span>
@@ -485,6 +507,12 @@ export default function ChapterReader({
 
           <NotesPanel
             notes={pageNotes}
+            anchors={verseAnchors}
+            trackHeight={articleHeight}
+            articleRef={articleRef}
+            bookName={bookName}
+            focusVerseKey={focusVerseKey}
+            onFocusVerseKey={setFocusVerseKey}
             expanded={expanded}
             onToggle={(id) =>
               setExpanded((s) => {
