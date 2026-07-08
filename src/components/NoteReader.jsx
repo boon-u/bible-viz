@@ -77,7 +77,7 @@ export default function NoteReader({ note, reads, onOpenRef, onDelete, onBack })
       )}
 
       <div className="note-body">
-        <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={components} urlTransform={(u) => (/^javascript:/i.test(u) ? "" : u)}>
           {md}
         </ReactMarkdown>
       </div>
