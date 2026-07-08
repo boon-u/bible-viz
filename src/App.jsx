@@ -192,8 +192,9 @@ export default function App() {
           bookName={view.book}
           chapter={view.chapter}
           store={store}
-          notes={notesStore.notes}
+          notesStore={notesStore}
           annoStore={annoStore}
+          onOpenNote={openNoteById}
           onChangeLocation={openRead}
         />
       )}

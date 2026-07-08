@@ -300,6 +300,22 @@ export function useNotes({ supabase, profileId } = {}) {
     [cloud, persistCloudNote],
   );
 
+  const updateNote = useCallback(
+    (id, patch) => {
+      let updated = null;
+      setNotes((prev) => {
+        const next = prev.map((n) =>
+          n.id === id ? (updated = { ...n, ...patch, updatedAt: new Date().toISOString() }) : n,
+        );
+        if (!cloud) saveLocalNotes(next);
+        return sortNotes(next);
+      });
+      if (cloud && updated) persistCloudNote(updated);
+      return updated;
+    },
+    [cloud, persistCloudNote],
+  );
+
   const deleteNote = useCallback(
     (id) => {
       setNotes((prev) => {
@@ -350,5 +366,14 @@ export function useNotes({ supabase, profileId } = {}) {
     [notes],
   );
 
-  return { notes, ready, cloud, addNotes, deleteNote, importNotes, exportNotes };
+  // Create one note from the reader (anchored to a verse) and return it.
+  const addNote = useCallback(
+    async (raw) => {
+      const [note] = await addNotes([raw]);
+      return note;
+    },
+    [addNotes],
+  );
+
+  return { notes, ready, cloud, addNote, addNotes, updateNote, deleteNote, importNotes, exportNotes };
 }
