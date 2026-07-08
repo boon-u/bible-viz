@@ -6,6 +6,7 @@ import { useProfiles } from "./lib/profiles";
 import Overview from "./components/Overview";
 import LogRead from "./components/LogRead";
 import BookView from "./components/BookView";
+import ChapterReader from "./components/ChapterReader";
 import NotesBrowser from "./components/NotesBrowser";
 import NoteReader from "./components/NoteReader";
 import GraphView from "./components/GraphView";
@@ -74,6 +75,13 @@ export default function App() {
   const openBook = (book, focus) => setView({ name: "book", book, focus });
   const openNoteById = (id) => setView({ name: "note", noteId: id });
   const openTopic = (tag) => setView({ name: "notes", tag });
+  const openRead = (book, chapter) => setView({ name: "read", book, chapter });
+
+  // Default reader location: the most recently read passage, else John 1.
+  const openReadDefault = () => {
+    const last = store.reads.length ? store.reads.reduce((a, b) => (b.ts > a.ts ? b : a)) : null;
+    openRead(last?.book ?? "John", last?.chapter ?? 1);
+  };
 
   // Navigate to a structured Scripture reference: focus the verse when known,
   // else open the book.
@@ -114,6 +122,12 @@ export default function App() {
         </button>
         <nav>
           {navItem("overview", "Overview")}
+          <button
+            className={view.name === "read" ? "nav-btn active" : "nav-btn"}
+            onClick={openReadDefault}
+          >
+            Read
+          </button>
           {navItem("notes", "Notes")}
           {navItem("graph", "Graph")}
           {navItem("log", "+ Log a read")}
@@ -168,6 +182,15 @@ export default function App() {
         <Overview store={store} notesStore={notesStore} profile={profile} onOpenBook={openBook} />
       )}
       {view.name === "log" && <LogRead store={store} />}
+      {view.name === "read" && (
+        <ChapterReader
+          bookName={view.book}
+          chapter={view.chapter}
+          store={store}
+          notes={notesStore.notes}
+          onChangeLocation={openRead}
+        />
+      )}
       {view.name === "notes" && (
         <NotesBrowser key={view.tag ?? "all"} notes={notesStore.notes} initialTag={view.tag} onOpen={(n) => openNoteById(n.id)} />
       )}

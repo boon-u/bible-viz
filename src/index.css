@@ -1449,3 +1449,95 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .cmdk-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cmdk-empty { padding: 18px 16px; color: var(--muted); font-size: 14px; }
 .cmdk-hint { padding: 8px 16px; font-size: 11px; color: var(--cell-num); border-top: 1px solid var(--border); }
+
+/* ─── Chapter reader (Stage 1) ─────────────────────────────────────────── */
+.reader { max-width: 760px; margin: 0 auto; }
+.reader-nav { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.reader-nav select {
+  padding: 8px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 14px;
+}
+.reader-nav .ghost-btn { margin-top: 0; }
+.reader-hint { color: var(--muted); font-size: 13px; margin: 12px 0 4px; }
+
+/* The reading surface uses the warm "paper" look + serif, like the note reader */
+.reader-text {
+  background: var(--paper);
+  color: var(--paper-text);
+  border: 1px solid var(--paper-border);
+  border-radius: 16px;
+  box-shadow: var(--paper-shadow);
+  padding: 36px 48px;
+}
+.rd-chapter + .rd-chapter { margin-top: 28px; padding-top: 8px; }
+.rd-chapter-head {
+  font-family: var(--font-serif);
+  font-weight: 700;
+  font-size: 22px;
+  color: var(--paper-text);
+  margin: 0 0 12px;
+}
+.rd-loading { color: var(--paper-muted); font-style: italic; }
+.rd-prose {
+  font-family: var(--font-serif);
+  font-size: 19px;
+  line-height: 1.85;
+  margin: 0;
+  text-align: justify;
+}
+.rd-verse { border-radius: 4px; transition: background 0.12s; }
+.rd-verse.read { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.rd-verse.sel { background: color-mix(in srgb, var(--accent) 32%, transparent); }
+.rd-vnum {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 0 3px 0 1px;
+  vertical-align: super;
+  position: relative;
+  user-select: none;
+}
+.rd-vnum:hover { text-decoration: underline; }
+.rd-note-dot {
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent-2);
+  margin-left: 1px;
+  vertical-align: middle;
+}
+
+.reader-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+.reader-foot .ghost-btn { margin-top: 0; }
+.reader-credit { font-size: 12px; color: var(--muted); }
+
+.reader-actionbar {
+  position: sticky;
+  bottom: 16px;
+  margin: 16px auto 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: var(--panel-shadow);
+  padding: 8px 8px 8px 18px;
+  width: fit-content;
+}
+.reader-sel-label { font-size: 14px; font-weight: 600; }
+.reader-actionbar .ghost-btn, .reader-actionbar .primary-btn { margin-top: 0; }
