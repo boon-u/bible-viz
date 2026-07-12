@@ -9,6 +9,8 @@ import { BIBLE } from "../data/bibleMeta";
 
 const cache = new Map(); // book index (1-based) -> { book, chapters }
 const inflight = new Map(); // dedupe concurrent loads
+const metaCache = new Map(); // book index -> chapter metadata
+const metaInflight = new Map();
 
 export function bookIndex(bookName) {
   return BIBLE.findIndex((b) => b.name === bookName) + 1; // 0 => unknown
@@ -30,6 +32,33 @@ export async function loadBook(bookName) {
   })();
   inflight.set(nr, p);
   return p;
+}
+
+export async function loadBookMeta(bookName) {
+  const nr = bookIndex(bookName);
+  if (!nr) return {};
+  if (metaCache.has(nr)) return metaCache.get(nr);
+  if (metaInflight.has(nr)) return metaInflight.get(nr);
+
+  const p = (async () => {
+    try {
+      const res = await fetch(`${import.meta.env.BASE_URL}bible/meta/${nr}.json`);
+      if (!res.ok) return {};
+      const data = await res.json();
+      metaCache.set(nr, data);
+      metaInflight.delete(nr);
+      return data;
+    } catch {
+      metaInflight.delete(nr);
+      return {};
+    }
+  })();
+  metaInflight.set(nr, p);
+  return p;
+}
+
+export function chapterMeta(bookMeta, chapter) {
+  return bookMeta?.[String(chapter)] ?? {};
 }
 
 // Returns [{ verse, text }] for one chapter.

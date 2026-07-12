@@ -1,15 +1,26 @@
+import { useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { inlineRefsToMarkdown, parseRef } from "../lib/refs";
+import {
+  categoryMeta,
+  crossRefLabel,
+  formatNoteDate,
+  formatScriptureRef,
+  studyDepth,
+} from "../lib/noteDisplay";
+import { noteCoversVerse, parseVerseKey, verseKey } from "../lib/noteVerseLink";
 
-// Allow our custom ref:/note: link schemes (react-markdown strips them by
-// default); still block javascript: URLs.
 const urlTransform = (url) => (/^javascript:/i.test(url) ? "" : url);
 
-// Side panel of the page's notes, collapsed to titles. Expand one (or all) to
-// read; bodies render Markdown with clickable note-to-note and scripture links.
 export default function NotesPanel({
   notes,
+  anchors,
+  trackHeight,
+  articleRef,
+  bookName,
+  focusVerseKey,
+  onFocusVerseKey,
   expanded,
   onToggle,
   onExpandAll,
@@ -18,13 +29,33 @@ export default function NotesPanel({
   onOpenNoteLink,
   onOpenRef,
 }) {
+  const positioned = useMemo(() => {
+    const seen = new Map();
+    return notes.map((n, i) => {
+      const key = verseKey(n.chapter, n.verseStart);
+      const base = anchors[key] ?? i * 36;
+      const stack = seen.get(key) ?? 0;
+      seen.set(key, stack + 1);
+      return { note: n, top: base + stack * 4 };
+    });
+  }, [notes, anchors]);
+
   if (!notes.length) return null;
+
+  const focus = parseVerseKey(focusVerseKey);
+  const isLinked = (n) => focus && noteCoversVerse(n, focus.chapter, focus.verse);
+
+  const scrollToVerse = (n) => {
+    articleRef.current
+      ?.querySelector(`.rd-vtext[data-ch="${n.chapter}"][data-v="${n.verseStart}"]`)
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
 
   const components = {
     a({ href, children }) {
       if (href?.startsWith("note:")) {
         return (
-          <button className="note-inline-link" onClick={() => onOpenNoteLink(href.slice(5))}>
+          <button type="button" className="notion-note-link" onClick={() => onOpenNoteLink(href.slice(5))}>
             {children}
           </button>
         );
@@ -32,7 +63,8 @@ export default function NotesPanel({
       if (href?.startsWith("ref:")) {
         return (
           <button
-            className="xref-inline"
+            type="button"
+            className="notion-note-link"
             onClick={() => onOpenRef(parseRef(decodeURIComponent(href.slice(4))))}
           >
             {children}
@@ -46,37 +78,114 @@ export default function NotesPanel({
   };
 
   return (
-    <aside className="notes-panel">
-      <div className="notes-panel-head">
-        <span className="notes-panel-title">Notes on this page</span>
-        <div className="notes-panel-tools">
-          <button onClick={onExpandAll}>Expand all</button>
-          <button onClick={onCollapseAll}>Collapse all</button>
+    <aside className="notion-rail" aria-label="Margin notes">
+      <div className="notion-rail-header">
+        <span className="notion-rail-title">Notes</span>
+        <div className="notion-rail-tools">
+          <button type="button" onClick={onExpandAll}>Expand all</button>
+          <span className="notion-rail-dot" aria-hidden="true">·</span>
+          <button type="button" onClick={onCollapseAll}>Collapse all</button>
         </div>
       </div>
-      {notes.map((n) => {
-        const open = expanded.has(n.id);
-        return (
-          <div key={n.id} id={`panel-note-${n.id}`} className={`panel-note${open ? " open" : ""}`}>
-            <button className="panel-note-title" onClick={() => onToggle(n.id)}>
-              <span className="panel-note-ref">
-                {n.chapter}:{n.verseStart}
-                {n.verseEnd !== n.verseStart ? `–${n.verseEnd}` : ""}
-              </span>
-              <span className="panel-note-name">{n.title}</span>
-              <span className="panel-note-caret">{open ? "▾" : "▸"}</span>
-            </button>
-            {open && (
-              <div className="panel-note-body">
-                <ReactMarkdown remarkPlugins={[remarkGfm]} components={components} urlTransform={urlTransform}>
-                  {inlineRefsToMarkdown(n.body)}
-                </ReactMarkdown>
-                <button className="panel-note-edit" onClick={() => onEdit(n)}>edit</button>
-              </div>
-            )}
-          </div>
-        );
-      })}
+
+      <div className="notion-rail-track" style={{ minHeight: trackHeight }}>
+        {positioned.map(({ note: n, top }) => {
+          const open = expanded.has(n.id);
+          const linked = isLinked(n);
+          const meta = categoryMeta(n.category);
+          const depth = studyDepth(n);
+          const xref = crossRefLabel(n);
+          const scripture = formatScriptureRef(n, bookName);
+
+          return (
+            <article
+              key={n.id}
+              id={`panel-note-${n.id}`}
+              className={`notion-card${open ? " open" : ""}${linked ? " linked" : ""}`}
+              style={{ top }}
+              onMouseEnter={() => onFocusVerseKey(verseKey(n.chapter, n.verseStart))}
+              onMouseLeave={() => onFocusVerseKey(null)}
+            >
+              <button type="button" className="notion-card-face" onClick={() => onToggle(n.id)}>
+                <div className="notion-card-row notion-card-row-title">
+                  <span className="notion-card-icon" aria-hidden="true">{meta.icon}</span>
+                  <span className="notion-card-name">{n.title || "Untitled"}</span>
+                </div>
+              </button>
+
+              {open && (
+                <>
+                  <div className="notion-card-preview">
+                    <div className="notion-card-row">
+                      <span className="notion-card-icon" aria-hidden="true">📍</span>
+                      <span
+                        className="notion-card-link"
+                        role="link"
+                        tabIndex={0}
+                        onClick={() => scrollToVerse(n)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            scrollToVerse(n);
+                          }
+                        }}
+                      >
+                        {scripture}
+                      </span>
+                    </div>
+
+                    {xref && (
+                      <div className="notion-card-row">
+                        <span className="notion-card-icon" aria-hidden="true">🔗</span>
+                        <span className="notion-card-link notion-card-link-muted">{xref}</span>
+                      </div>
+                    )}
+
+                    <div
+                      className="notion-card-pill"
+                      style={{ "--pill-dot": meta.dot, "--pill-bg": meta.bg }}
+                    >
+                      <span className="notion-card-pill-dot" aria-hidden="true" />
+                      {meta.label}
+                    </div>
+
+                    <div className="notion-card-progress">
+                      <span className="notion-card-progress-label">{depth}%</span>
+                      <div className="notion-card-progress-track">
+                        <div className="notion-card-progress-fill" style={{ width: `${depth}%` }} />
+                      </div>
+                    </div>
+
+                    <div className="notion-card-date">
+                      {n.updatedAt !== n.createdAt ? "Updated " : "Added "}
+                      {formatNoteDate(n.updatedAt ?? n.createdAt)}
+                    </div>
+                  </div>
+
+                  <div className="notion-card-body">
+                  {n.tags?.length > 0 && (
+                    <div className="notion-card-tags">
+                      {n.tags.map((t) => (
+                        <span key={t} className="notion-card-tag">{t}</span>
+                      ))}
+                    </div>
+                  )}
+                  {n.source && (
+                    <p className="notion-card-source">Source: {n.source}</p>
+                  )}
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={components} urlTransform={urlTransform}>
+                    {inlineRefsToMarkdown(n.body) || "_No content yet._"}
+                  </ReactMarkdown>
+                  <button type="button" className="notion-card-edit" onClick={() => onEdit(n)}>
+                    Edit
+                  </button>
+                </div>
+                </>
+              )}
+            </article>
+          );
+        })}
+      </div>
     </aside>
   );
 }

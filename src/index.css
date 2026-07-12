@@ -1450,13 +1450,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .cmdk-empty { padding: 18px 16px; color: var(--muted); font-size: 14px; }
 .cmdk-hint { padding: 8px 16px; font-size: 11px; color: var(--cell-num); border-top: 1px solid var(--border); }
 
-/* ─── Chapter reader — Notion-style monochrome ─────────────────────────── */
+/* ─── Chapter reader — study Bible layout ──────────────────────────────── */
 .reader-canvas {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-height: calc(100vh - 56px);
-  max-width: 920px;
+  max-width: 1120px;
   margin: 0 auto;
   width: 100%;
   padding: 0 20px 28px;
@@ -1603,79 +1603,200 @@ html[data-theme="light"] .reader-select {
   gap: 24px;
 }
 
-/* Clean Notion paper — no ruled lines or margin */
+/* Study Bible page — pure white paper */
 .reader-page {
   position: relative;
   flex: 1;
   min-width: 0;
-  background: var(--paper);
-  color: var(--paper-text);
-  border: 1px solid var(--paper-border);
-  border-radius: 16px;
-  box-shadow: var(--paper-shadow);
-  padding: 40px 48px 48px;
-  min-height: 480px;
+  --bible-bg: #ffffff;
+  --bible-text: #1a1a1a;
+  --bible-muted: #5c5c5c;
+  --bible-border: #d9d9d9;
+  --bible-red: #c41e3a;
+  background: var(--bible-bg);
+  color: var(--bible-text);
+  border: 1px solid var(--bible-border);
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  padding: 32px 40px 44px;
+  min-height: 520px;
 }
 
 .rd-chapter + .rd-chapter {
-  margin-top: 32px;
-  padding-top: 16px;
-  border-top: 1px solid var(--paper-border);
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--bible-border);
 }
 
 .rd-chapter-head {
-  font-family: var(--font-serif);
-  font-weight: 700;
-  font-size: 26px;
-  line-height: 1.2;
-  letter-spacing: -0.02em;
-  color: var(--paper-text);
-  margin: 0 0 18px;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 11px;
+  line-height: 1.3;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--bible-muted);
+  margin: 0 0 20px;
 }
 
 .rd-loading {
-  color: var(--paper-muted);
+  color: var(--bible-muted);
   font-style: italic;
   font-family: var(--font-serif);
+  text-align: center;
 }
 
-.rd-prose {
+/* Two-column prose body (open Bible spread) */
+.rd-body {
+  column-count: 2;
+  column-gap: 2.4em;
+  column-fill: balance;
+  column-rule: 1px solid var(--bible-border);
   font-family: var(--font-serif);
-  font-size: 19px;
-  line-height: 1.85;
-  margin: 0;
+  font-size: 16.5px;
+  line-height: 1.48;
+  text-align: justify;
+  text-justify: inter-word;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+.rd-body--poetry {
+  column-count: 1;
   text-align: left;
   hyphens: none;
 }
 
-.rd-vnum {
-  font-family: var(--font-sans);
-  font-size: 10px;
+.rd-para {
+  margin: 0 0 0.9em;
+  break-inside: avoid-column;
+}
+
+.rd-para-first {
+  text-indent: 0;
+}
+
+.rd-para:not(.rd-para-first) {
+  text-indent: 1.6em;
+}
+
+/* Large chapter numeral at column start (ESV / CSB style) */
+.rd-chapter-drop {
+  float: left;
+  font-family: var(--font-serif);
+  font-size: 3.4em;
+  font-weight: 700;
+  line-height: 0.82;
+  letter-spacing: -0.03em;
+  margin: 0.04em 0.1em 0 0;
+  color: var(--bible-text);
+  user-select: none;
+}
+
+.rd-verse-block {
+  display: inline;
+}
+
+/* Section headings (from Berean Standard Bible, public domain) */
+.rd-section-head {
+  display: block;
+  font-family: var(--font-serif);
+  font-weight: 700;
+  color: var(--bible-text);
+  break-after: avoid-column;
+  margin: 0.85em 0 0.35em;
+  line-height: 1.25;
+}
+
+.rd-para-first .rd-section-head:first-of-type {
+  margin-top: 0.15em;
+}
+
+.rd-section-head--1 {
+  font-size: 0.95em;
+  letter-spacing: 0.02em;
+}
+
+.rd-section-head--2 {
+  font-size: 0.82em;
   font-weight: 600;
-  color: var(--paper-muted);
+  font-style: italic;
+  color: var(--bible-muted);
+  margin-top: 0.65em;
+}
+
+.rd-verse {
+  display: inline;
+}
+
+.rd-vnum {
+  font-family: var(--font-serif);
+  font-size: 0.62em;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--bible-text) 72%, var(--bible-muted));
   cursor: default;
-  padding: 0 3px 0 1px;
+  padding: 0 0.15em 0 0.05em;
   vertical-align: super;
+  line-height: 0;
   position: relative;
+  top: -0.05em;
   user-select: none;
 }
 
 .rd-vnum.annot { cursor: pointer; }
-.rd-vnum.annot:hover { color: var(--paper-text); text-decoration: underline; }
+.rd-vnum.annot:hover { color: var(--bible-text); }
 
 .rd-read-dot,
 .rd-note-dot {
   display: inline-block;
-  width: 4px;
-  height: 4px;
+  width: 3px;
+  height: 3px;
   border-radius: 50%;
-  background: var(--paper-muted);
-  margin-left: 2px;
+  background: var(--bible-muted);
+  margin-left: 1px;
   vertical-align: middle;
-  opacity: 0.7;
+  opacity: 0.75;
 }
 
-.rd-vtext { border-radius: 3px; }
+.rd-vtext { border-radius: 2px; transition: background 0.15s, box-shadow 0.15s; }
+
+.rd-vtext--has-notes {
+  cursor: default;
+}
+
+.rd-vtext--linked {
+  background: rgba(35, 131, 226, 0.14);
+  border-radius: 2px;
+}
+
+/* Red-letter edition — words of Jesus */
+.rd-wj {
+  color: var(--bible-red);
+}
+
+mark.rd-hl.rd-wj {
+  color: var(--bible-red);
+}
+
+/* Poetry books — one verse per line, hanging indent */
+.rd-poetry-line {
+  margin: 0 0 0.42em;
+  padding-left: 2em;
+  text-indent: -2em;
+  break-inside: avoid-column;
+}
+
+.rd-poetry-line .rd-vnum {
+  display: inline-block;
+  width: 1.6em;
+  text-align: right;
+  padding-right: 0.35em;
+  vertical-align: baseline;
+  font-size: 0.68em;
+  top: 0;
+}
 
 /* Highlights keep their assigned colors — only UI chrome is monochrome */
 .rd-hl {
@@ -1834,120 +1955,333 @@ html[data-theme="light"] .reader-select {
   padding: 2px 4px;
 }
 
-/* Side notes — Notion callout cards */
-.notes-panel {
-  flex: 0 0 240px;
+/* ─── Notion gallery cards — verse-aligned study notes ──────────────────── */
+.notion-rail {
+  flex: 0 0 232px;
+  position: relative;
+  align-self: stretch;
+  pointer-events: none;
+}
+
+.notion-rail-header {
   position: sticky;
   top: 120px;
-  align-self: flex-start;
-  max-height: calc(100vh - 140px);
-  overflow-y: auto;
-}
-
-.notes-panel-head {
+  z-index: 5;
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
+  gap: 8px;
+  padding: 0 2px 10px;
+  margin-bottom: 8px;
+  pointer-events: auto;
 }
 
-.notes-panel-title {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted);
+.notion-rail-title {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--paper-muted);
 }
 
-.notes-panel-tools button {
-  font-size: 11px;
-  background: none;
-  border: none;
-  color: var(--muted);
-  padding: 0 0 0 8px;
-}
-
-.notes-panel-tools button:hover { color: var(--text); }
-
-.panel-note {
-  background: var(--paper-card);
-  border: 1px solid var(--paper-border);
-  border-radius: 10px;
-  margin-bottom: 10px;
-  overflow: hidden;
-  transition: border-color 0.12s;
-}
-
-.panel-note:hover { border-color: var(--muted); }
-
-.panel-note.open {
-  border-color: color-mix(in srgb, var(--text) 25%, var(--paper-border));
-}
-
-.panel-note-title {
-  width: 100%;
+.notion-rail-tools {
   display: flex;
   align-items: center;
-  gap: 8px;
-  text-align: left;
-  background: none;
+  gap: 4px;
+}
+
+.notion-rail-tools button {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 400;
+  padding: 2px 4px;
   border: none;
-  padding: 10px 12px;
+  background: none;
+  color: var(--paper-muted);
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.notion-rail-tools button:hover {
+  background: var(--paper-2);
   color: var(--paper-text);
 }
 
-.panel-note-ref {
-  font-family: var(--font-sans);
-  font-size: 10px;
-  font-weight: 600;
+.notion-rail-dot {
   color: var(--paper-muted);
-  font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
+  font-size: 12px;
+  user-select: none;
 }
 
-.panel-note-name {
+.notion-rail-track {
+  position: relative;
+  width: 100%;
+}
+
+/* Gallery card — matches Notion board/gallery database cards */
+.notion-card {
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: auto;
+  z-index: 1;
+  background: var(--paper-card);
+  border: 1px solid var(--paper-border);
+  border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(15, 15, 15, 0.04);
+  transition: box-shadow 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
+  overflow: hidden;
+}
+
+.notion-card.open,
+.notion-card.linked {
+  z-index: 8;
+}
+
+.notion-card:not(.linked):not(:hover) {
+  opacity: 0.92;
+}
+
+.notion-card:hover {
+  box-shadow: 0 2px 8px rgba(15, 15, 15, 0.08);
+}
+
+.notion-card.linked {
+  opacity: 1;
+  border-color: color-mix(in srgb, #2383e2 35%, var(--paper-border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, #2383e2 20%, transparent);
+}
+
+.notion-card-face {
+  width: 100%;
+  display: block;
+  text-align: left;
+  padding: 8px 10px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--paper-text);
+}
+
+.notion-card.open .notion-card-face {
+  border-bottom: 1px solid var(--paper-border);
+}
+
+.notion-card-preview {
+  padding: 8px 12px 10px;
+  border-bottom: 1px solid var(--paper-border);
+}
+
+.notion-card-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 6px;
+  min-width: 0;
+}
+
+.notion-card-row-title {
+  margin-bottom: 8px;
+}
+
+.notion-card-icon {
+  flex-shrink: 0;
+  width: 16px;
+  font-size: 13px;
+  line-height: 1.35;
+  text-align: center;
+  opacity: 0.9;
+}
+
+.notion-card-name {
   flex: 1;
-  font-family: var(--font-serif);
-  font-size: 14px;
+  min-width: 0;
+  font-family: var(--font-sans);
+  font-size: 12px;
   font-weight: 600;
+  line-height: 1.35;
+  color: var(--paper-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.panel-note-caret { color: var(--paper-muted); font-size: 10px; }
-
-.panel-note-body {
-  font-family: var(--font-serif);
-  font-size: 14px;
-  line-height: 1.65;
-  color: var(--paper-text);
-  padding: 0 12px 12px;
-  border-top: 1px solid var(--paper-border);
-  margin: 0 8px;
-  padding-top: 10px;
+.notion-card.open .notion-card-name {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
-.panel-note-body p { margin: 0 0 8px; }
+.notion-card-link {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--paper-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: color-mix(in srgb, var(--paper-muted) 60%, transparent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
 
-.panel-note-edit {
+.notion-card-link-muted {
+  text-decoration: none;
+  color: var(--paper-muted);
+}
+
+.notion-card-link:hover {
+  color: #2383e2;
+  text-decoration-color: #2383e2;
+}
+
+.notion-card-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--pill-bg, var(--paper-2));
   font-family: var(--font-sans);
   font-size: 11px;
-  background: none;
-  border: none;
-  color: var(--paper-muted);
-  padding: 2px 0 0;
-  text-decoration: underline;
+  font-weight: 500;
+  color: var(--paper-text);
+  margin-bottom: 8px;
 }
 
-.panel-note-edit:hover { color: var(--paper-text); }
+.notion-card-pill-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--pill-dot, var(--paper-muted));
+  flex-shrink: 0;
+}
+
+.notion-card-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.notion-card-progress-label {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--paper-muted);
+  min-width: 28px;
+}
+
+.notion-card-progress-track {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--paper-2);
+  overflow: hidden;
+}
+
+.notion-card-progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: color-mix(in srgb, #0f7b6c 75%, var(--paper-muted));
+  transition: width 0.2s ease;
+}
+
+.notion-card-date {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--paper-muted);
+  line-height: 1.3;
+}
+
+.notion-card-body {
+  padding: 8px 12px 12px;
+  font-family: var(--font-serif);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--paper-text);
+}
+
+.notion-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 10px 0 8px;
+}
+
+.notion-card-tag {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--paper-2);
+  color: var(--paper-muted);
+}
+
+.notion-card-source {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--paper-muted);
+  margin: 10px 0 6px;
+  font-style: italic;
+}
+
+.notion-card-body p { margin: 0 0 6px; }
+
+.notion-card-body h1,
+.notion-card-body h2,
+.notion-card-body h3 {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0.5em 0 0.25em;
+}
+
+.notion-card-body ul,
+.notion-card-body ol {
+  margin: 0 0 6px;
+  padding-left: 1.2em;
+}
+
+.notion-card-edit {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 400;
+  margin-top: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--paper-muted);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.notion-card-edit:hover { color: var(--paper-text); }
+
+.notion-note-link {
+  background: none;
+  border: none;
+  color: #2383e2;
+  font-weight: 400;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 
 .note-inline-link {
   background: color-mix(in srgb, var(--paper-muted) 18%, transparent);
   border: none;
   border-radius: 4px;
   color: var(--paper-text);
-  padding: 0 4px;
+  padding: 0 3px;
   font-size: 0.92em;
   cursor: pointer;
   text-decoration: underline;
@@ -1967,17 +2301,40 @@ html[data-theme="light"] .reader-select {
 
   .reader-desk { flex-direction: column; }
 
-  .reader-page {
-    padding: 28px 24px 36px;
-  }
-
-  .rd-prose { font-size: 18px; line-height: 1.8; }
-
-  .notes-panel {
+  .notion-rail {
     flex: none;
     width: 100%;
+    align-self: auto;
+  }
+
+  .notion-rail-header {
     position: static;
-    max-height: none;
+  }
+
+  .notion-rail-track {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 0 !important;
+  }
+
+  .notion-card {
+    position: static !important;
+    opacity: 1 !important;
+  }
+
+  .reader-page {
+    padding: 24px 20px 32px;
+  }
+
+  .rd-body {
+    column-count: 1;
+    font-size: 17px;
+    line-height: 1.5;
+  }
+
+  .rd-chapter-drop {
+    font-size: 2.8em;
   }
 }
 

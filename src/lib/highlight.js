@@ -101,15 +101,18 @@ export function fillIntervalsForVerse(fillHls, verse, textLen) {
   return out;
 }
 
-// Split verse text into segments given fill intervals; each segment lists the
-// highlights covering it (so overlaps can blend). Returns [{text, hls|null}].
-export function segmentVerseFill(text, intervals) {
-  if (!intervals || intervals.length === 0) return [{ text, hls: null }];
+// Split verse text into segments given fill intervals and red-letter ranges.
+// Returns [{ text, hls, wj }].
+export function segmentVerseDisplay(text, intervals, wjRanges = []) {
   const len = text.length;
   const points = new Set([0, len]);
-  for (const i of intervals) {
+  for (const i of intervals ?? []) {
     points.add(clamp(i.s, 0, len));
     points.add(clamp(i.e, 0, len));
+  }
+  for (const [s, e] of wjRanges) {
+    points.add(clamp(s, 0, len));
+    points.add(clamp(e, 0, len));
   }
   const cuts = [...points].sort((a, b) => a - b);
   const segs = [];
@@ -117,8 +120,9 @@ export function segmentVerseFill(text, intervals) {
     const s = cuts[k];
     const e = cuts[k + 1];
     if (s >= e) continue;
-    const covering = intervals.filter((i) => i.s <= s && i.e >= e);
-    const key = covering.map((c) => c.id).join(",");
+    const covering = (intervals ?? []).filter((i) => i.s <= s && i.e >= e);
+    const wj = (wjRanges ?? []).some(([ws, we]) => ws <= s && we >= e);
+    const key = `${covering.map((c) => c.id).join(",")}|${wj ? "w" : ""}`;
     const piece = text.slice(s, e);
     const prev = segs[segs.length - 1];
     if (prev && prev.key === key) prev.text += piece;
@@ -126,10 +130,15 @@ export function segmentVerseFill(text, intervals) {
       segs.push({
         text: piece,
         key,
+        wj,
         hls: covering.length ? covering.map((c) => ({ id: c.id, color: c.color })) : null,
       });
   }
-  return segs;
+  return segs.length ? segs : [{ text, hls: null, wj: false }];
+}
+
+export function segmentVerseFill(text, intervals) {
+  return segmentVerseDisplay(text, intervals).map(({ text: t, hls }) => ({ text: t, hls }));
 }
 
 function hexToRgb(hex) {

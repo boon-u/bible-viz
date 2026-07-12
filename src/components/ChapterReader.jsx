@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BIBLE, OT_COUNT, bookByName } from "../data/bibleMeta";
-import { getChapter, WEB_CREDIT } from "../lib/bibleText";
+import { getChapter, loadBookMeta, chapterMeta, WEB_CREDIT } from "../lib/bibleText";
 import { bookVerseMap } from "../lib/aggregate";
 import { noteMarksForBook } from "../lib/notes";
 import { highlightsForChapter, highlightCoversPoint } from "../lib/annotations";
@@ -8,10 +8,13 @@ import {
   blendFill,
   fillIntervalsForVerse,
   offsetInContainer,
-  segmentVerseFill,
+  segmentVerseDisplay,
   selectionToRanges,
 } from "../lib/highlight";
 import { expandRangeToReads } from "../lib/readRange";
+import { chapterFlow, isPoetryBook } from "../lib/bibleLayout";
+import { verseKey, verseKeysWithNotes } from "../lib/noteVerseLink";
+import { useVerseAnchors } from "../lib/useVerseAnchors";
 import { todayISO } from "../lib/store";
 import ScribbleOverlay from "./ScribbleOverlay";
 import SelectionPopover from "./SelectionPopover";
@@ -34,12 +37,14 @@ export default function ChapterReader({
   const articleRef = useRef();
   const [chapters, setChapters] = useState([chapter]);
   const [verseMap, setVerseMap] = useState({});
+  const [bookMeta, setBookMeta] = useState({});
   const [annotate, setAnnotate] = useState(false);
   const [penStyle, setPenStyle] = useState("fill");
   const [pending, setPending] = useState(null);
   const [sessions, setSessions] = useState(null);
   const [editing, setEditing] = useState(null);
   const [expanded, setExpanded] = useState(() => new Set());
+  const [focusVerseKey, setFocusVerseKey] = useState(null);
   const date = todayISO();
 
   useEffect(() => {
@@ -47,7 +52,18 @@ export default function ChapterReader({
     setPending(null);
     setSessions(null);
     setEditing(null);
+    setFocusVerseKey(null);
   }, [bookName, chapter]);
+
+  useEffect(() => {
+    let alive = true;
+    loadBookMeta(bookName)
+      .then((m) => alive && setBookMeta(m))
+      .catch(() => alive && setBookMeta({}));
+    return () => {
+      alive = false;
+    };
+  }, [bookName]);
 
   useEffect(() => {
     let alive = true;
@@ -88,6 +104,15 @@ export default function ChapterReader({
       .filter((n) => n.book === bookName && shown.has(n.chapter) && n.verseStart != null)
       .sort((a, b) => a.chapter - b.chapter || a.verseStart - b.verseStart);
   }, [notes, bookName, chapters]);
+
+  const versesWithNotes = useMemo(() => verseKeysWithNotes(pageNotes), [pageNotes]);
+
+  const anchorRevision = `${overlayRevision}|${pageNotes.length}|${expanded.size}|${Object.keys(bookMeta).length}|${focusVerseKey ?? ""}`;
+
+  const { anchors: verseAnchors, height: articleHeight } = useVerseAnchors(
+    articleRef,
+    anchorRevision,
+  );
 
   const showPopoverForSelection = () => {
     const sel = window.getSelection();
@@ -243,6 +268,141 @@ export default function ChapterReader({
   const canPrev = chapters[0] > 1;
   const canNext = lastCh < book.chapters.length;
   const goto = (ch) => onChangeLocation(bookName, ch);
+  const poetry = isPoetryBook(bookName);
+
+  const wjFor = (ch, verse) => chapterMeta(bookMeta, ch).wj?.[String(verse)] ?? [];
+
+  const renderSegments = (segs) =>
+    segs.map((seg, i) => {
+      if (seg.hls) {
+        return (
+          <mark
+            key={i}
+            className={`rd-hl${seg.wj ? " rd-wj" : ""}`}
+            style={{ background: blendFill(seg.hls.map((h) => h.color)) }}
+          >
+            {seg.text}
+          </mark>
+        );
+      }
+      if (seg.wj) {
+        return (
+          <span key={i} className="rd-wj">
+            {seg.text}
+          </span>
+        );
+      }
+      return <span key={i}>{seg.text}</span>;
+    });
+
+  const renderVerseInner = (ch, verse, text, fillHls, hideNum = false) => {
+    const readCount = counts.get(`${ch}:${verse}`)?.count ?? 0;
+    const hasNote = (noteMarks.get(`${ch}:${verse}`) ?? 0) > 0;
+    const intervals = fillIntervalsForVerse(fillHls, verse, text.length);
+    const segs = segmentVerseDisplay(text, intervals, wjFor(ch, verse));
+    const vKey = verseKey(ch, verse);
+    const linkable = versesWithNotes.has(vKey);
+    const linked = focusVerseKey === vKey;
+    return (
+      <span className={`rd-verse${readCount > 0 ? " read" : ""}`}>
+        {!hideNum && (
+          <sup
+            className={`rd-vnum${annotate ? " annot" : ""}`}
+            onClick={() => onVnum(ch, verse)}
+          >
+            {verse}
+            {readCount > 0 && <span className="rd-read-dot" />}
+            {hasNote && <span className="rd-note-dot" />}
+          </sup>
+        )}
+        <span
+          className={`rd-vtext${linked ? " rd-vtext--linked" : ""}${linkable ? " rd-vtext--has-notes" : ""}`}
+          data-ch={ch}
+          data-v={verse}
+          onMouseEnter={() => linkable && setFocusVerseKey(vKey)}
+          onMouseLeave={() => focusVerseKey === vKey && setFocusVerseKey(null)}
+        >
+          {renderSegments(segs)}
+        </span>
+      </span>
+    );
+  };
+
+  const renderChapterBody = (ch, verses, fillHls) => {
+    const meta = chapterMeta(bookMeta, ch);
+    const headings = meta.h ?? [];
+
+    if (poetry) {
+      return (
+        <div className="rd-body rd-body--poetry">
+          {chapterFlow(verses, headings).map((item, i) =>
+            item.type === "heading" ? (
+              <div
+                key={`h-${i}`}
+                className={`rd-section-head rd-section-head--${item.level}`}
+                role="heading"
+                aria-level={item.level === 1 ? 3 : 4}
+              >
+                {item.title}
+              </div>
+            ) : (
+              <p key={`v-${item.verse}`} className="rd-poetry-line">
+                {renderVerseInner(ch, item.verse, item.text, fillHls)}
+              </p>
+            ),
+          )}
+        </div>
+      );
+    }
+
+    const items = chapterFlow(verses, headings);
+    const nodes = [];
+    let paraVerses = [];
+    let isFirstPara = true;
+    let nodeKey = 0;
+
+    const flushPara = () => {
+      if (!paraVerses.length) return;
+      const k = nodeKey++;
+      nodes.push(
+        <p key={`p-${ch}-${k}`} className={`rd-para${isFirstPara ? " rd-para-first" : ""}`}>
+          {isFirstPara && <span className="rd-chapter-drop" aria-hidden="true">{ch}</span>}
+          {paraVerses.map((v, vi) => (
+            <span key={v.verse} className="rd-verse-block">
+              {renderVerseInner(ch, v.verse, v.text, fillHls, isFirstPara && v.verse === 1)}
+              {vi < paraVerses.length - 1 ? " " : null}
+            </span>
+          ))}
+        </p>,
+      );
+      paraVerses = [];
+      isFirstPara = false;
+    };
+
+    for (const item of items) {
+      if (item.type === "heading") {
+        flushPara();
+        nodes.push(
+          <div
+            key={`h-${ch}-${nodeKey++}`}
+            className={`rd-section-head rd-section-head--${item.level}`}
+            role="heading"
+            aria-level={item.level === 1 ? 3 : 4}
+          >
+            {item.title}
+          </div>,
+        );
+        continue;
+      }
+      if (paraVerses.length && /[.!?]["'”»]?\s*$/.test(paraVerses.at(-1).text.trim())) {
+        flushPara();
+      }
+      paraVerses.push(item);
+    }
+    flushPara();
+
+    return <div className="rd-body">{nodes}</div>;
+  };
 
   return (
     <main className="reader-canvas">
@@ -337,41 +497,7 @@ export default function ChapterReader({
                   ) : verses.length === 0 ? (
                     <p className="rd-loading">No text found.</p>
                   ) : (
-                    <p className="rd-prose">
-                      {verses.map(({ verse, text }) => {
-                        const readCount = counts.get(`${ch}:${verse}`)?.count ?? 0;
-                        const hasNote = (noteMarks.get(`${ch}:${verse}`) ?? 0) > 0;
-                        const intervals = fillIntervalsForVerse(fillHls, verse, text.length);
-                        const segs = segmentVerseFill(text, intervals);
-                        return (
-                          <span key={verse} className={`rd-verse${readCount > 0 ? " read" : ""}`}>
-                            <sup
-                              className={`rd-vnum${annotate ? " annot" : ""}`}
-                              onClick={() => onVnum(ch, verse)}
-                            >
-                              {verse}
-                              {readCount > 0 && <span className="rd-read-dot" />}
-                              {hasNote && <span className="rd-note-dot" />}
-                            </sup>
-                            <span className="rd-vtext" data-ch={ch} data-v={verse}>
-                              {segs.map((seg, i) =>
-                                seg.hls ? (
-                                  <mark
-                                    key={i}
-                                    className="rd-hl"
-                                    style={{ background: blendFill(seg.hls.map((h) => h.color)) }}
-                                  >
-                                    {seg.text}
-                                  </mark>
-                                ) : (
-                                  <span key={i}>{seg.text}</span>
-                                ),
-                              )}
-                            </span>{" "}
-                          </span>
-                        );
-                      })}
-                    </p>
+                    renderChapterBody(ch, verses, fillHls)
                   )}
                 </section>
               );
@@ -381,6 +507,12 @@ export default function ChapterReader({
 
           <NotesPanel
             notes={pageNotes}
+            anchors={verseAnchors}
+            trackHeight={articleHeight}
+            articleRef={articleRef}
+            bookName={bookName}
+            focusVerseKey={focusVerseKey}
+            onFocusVerseKey={setFocusVerseKey}
             expanded={expanded}
             onToggle={(id) =>
               setExpanded((s) => {
