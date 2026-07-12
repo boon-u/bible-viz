@@ -33,10 +33,10 @@ export default function NotesPanel({
     const seen = new Map();
     return notes.map((n, i) => {
       const key = verseKey(n.chapter, n.verseStart);
-      const base = anchors[key] ?? i * 88;
+      const base = anchors[key] ?? i * 36;
       const stack = seen.get(key) ?? 0;
       seen.set(key, stack + 1);
-      return { note: n, top: base + stack * 10 };
+      return { note: n, top: base + stack * 4 };
     });
   }, [notes, anchors]);
 
@@ -111,59 +111,58 @@ export default function NotesPanel({
                   <span className="notion-card-icon" aria-hidden="true">{meta.icon}</span>
                   <span className="notion-card-name">{n.title || "Untitled"}</span>
                 </div>
-
-                <div className="notion-card-row">
-                  <span className="notion-card-icon" aria-hidden="true">📍</span>
-                  <span
-                    className="notion-card-link"
-                    role="link"
-                    tabIndex={0}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      scrollToVerse(n);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        scrollToVerse(n);
-                      }
-                    }}
-                  >
-                    {scripture}
-                  </span>
-                </div>
-
-                {xref && (
-                  <div className="notion-card-row">
-                    <span className="notion-card-icon" aria-hidden="true">🔗</span>
-                    <span className="notion-card-link notion-card-link-muted">{xref}</span>
-                  </div>
-                )}
-
-                <div
-                  className="notion-card-pill"
-                  style={{ "--pill-dot": meta.dot, "--pill-bg": meta.bg }}
-                >
-                  <span className="notion-card-pill-dot" aria-hidden="true" />
-                  {meta.label}
-                </div>
-
-                <div className="notion-card-progress">
-                  <span className="notion-card-progress-label">{depth}%</span>
-                  <div className="notion-card-progress-track">
-                    <div className="notion-card-progress-fill" style={{ width: `${depth}%` }} />
-                  </div>
-                </div>
-
-                <div className="notion-card-date">
-                  {n.updatedAt !== n.createdAt ? "Updated " : "Added "}
-                  {formatNoteDate(n.updatedAt ?? n.createdAt)}
-                </div>
               </button>
 
               {open && (
-                <div className="notion-card-body">
+                <>
+                  <div className="notion-card-preview">
+                    <div className="notion-card-row">
+                      <span className="notion-card-icon" aria-hidden="true">📍</span>
+                      <span
+                        className="notion-card-link"
+                        role="link"
+                        tabIndex={0}
+                        onClick={() => scrollToVerse(n)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            scrollToVerse(n);
+                          }
+                        }}
+                      >
+                        {scripture}
+                      </span>
+                    </div>
+
+                    {xref && (
+                      <div className="notion-card-row">
+                        <span className="notion-card-icon" aria-hidden="true">🔗</span>
+                        <span className="notion-card-link notion-card-link-muted">{xref}</span>
+                      </div>
+                    )}
+
+                    <div
+                      className="notion-card-pill"
+                      style={{ "--pill-dot": meta.dot, "--pill-bg": meta.bg }}
+                    >
+                      <span className="notion-card-pill-dot" aria-hidden="true" />
+                      {meta.label}
+                    </div>
+
+                    <div className="notion-card-progress">
+                      <span className="notion-card-progress-label">{depth}%</span>
+                      <div className="notion-card-progress-track">
+                        <div className="notion-card-progress-fill" style={{ width: `${depth}%` }} />
+                      </div>
+                    </div>
+
+                    <div className="notion-card-date">
+                      {n.updatedAt !== n.createdAt ? "Updated " : "Added "}
+                      {formatNoteDate(n.updatedAt ?? n.createdAt)}
+                    </div>
+                  </div>
+
+                  <div className="notion-card-body">
                   {n.tags?.length > 0 && (
                     <div className="notion-card-tags">
                       {n.tags.map((t) => (
@@ -181,6 +180,7 @@ export default function NotesPanel({
                     Edit
                   </button>
                 </div>
+                </>
               )}
             </article>
           );

@@ -2055,11 +2055,20 @@ mark.rd-hl.rd-wj {
   width: 100%;
   display: block;
   text-align: left;
-  padding: 10px 12px;
+  padding: 8px 10px;
   border: none;
   background: none;
   cursor: pointer;
   color: var(--paper-text);
+}
+
+.notion-card.open .notion-card-face {
+  border-bottom: 1px solid var(--paper-border);
+}
+
+.notion-card-preview {
+  padding: 8px 12px 10px;
+  border-bottom: 1px solid var(--paper-border);
 }
 
 .notion-card-row {
@@ -2087,14 +2096,20 @@ mark.rd-hl.rd-wj {
   flex: 1;
   min-width: 0;
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   line-height: 1.35;
   color: var(--paper-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notion-card.open .notion-card-name {
+  white-space: normal;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 .notion-card-link {
@@ -2185,8 +2200,7 @@ mark.rd-hl.rd-wj {
 }
 
 .notion-card-body {
-  padding: 0 12px 12px;
-  border-top: 1px solid var(--paper-border);
+  padding: 8px 12px 12px;
   font-family: var(--font-serif);
   font-size: 12px;
   line-height: 1.6;
