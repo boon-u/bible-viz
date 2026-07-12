@@ -19,9 +19,6 @@ import HighlightSessions from "./HighlightSessions";
 import NotesPanel from "./NotesPanel";
 import NoteEditor from "./NoteEditor";
 
-// Reader with a paper-Bible annotation model: turn Annotate on, select text to
-// highlight (Fill or hand-drawn Scribble), click a highlight to manage its
-// sessions + titled notes. Highlighting auto-logs the read. Layout never shifts.
 export default function ChapterReader({
   bookName,
   chapter,
@@ -39,9 +36,9 @@ export default function ChapterReader({
   const [verseMap, setVerseMap] = useState({});
   const [annotate, setAnnotate] = useState(false);
   const [penStyle, setPenStyle] = useState("fill");
-  const [pending, setPending] = useState(null); // { ranges, pos }
-  const [sessions, setSessions] = useState(null); // { pos, ids }
-  const [editing, setEditing] = useState(null); // note editor state
+  const [pending, setPending] = useState(null);
+  const [sessions, setSessions] = useState(null);
+  const [editing, setEditing] = useState(null);
   const [expanded, setExpanded] = useState(() => new Set());
   const date = todayISO();
 
@@ -92,7 +89,6 @@ export default function ChapterReader({
       .sort((a, b) => a.chapter - b.chapter || a.verseStart - b.verseStart);
   }, [notes, bookName, chapters]);
 
-  // --- highlight creation from a selection --------------------------------
   const showPopoverForSelection = () => {
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed || !articleRef.current) return;
@@ -124,7 +120,6 @@ export default function ChapterReader({
           endOffset: r.endOffset,
         },
       });
-      // highlighting something means you read it → log it
       addReads(
         expandRangeToReads({
           book: bookName,
@@ -155,7 +150,6 @@ export default function ChapterReader({
     if (annotate) selectVerse(ch, v);
   };
 
-  // --- click a highlight → sessions popover -------------------------------
   const caretToPoint = (x, y) => {
     const range = document.caretRangeFromPoint?.(x, y);
     if (!range) return null;
@@ -172,16 +166,20 @@ export default function ChapterReader({
   const onArticleClick = (e) => {
     if (pending) return;
     const sel = window.getSelection();
-    if (sel && !sel.isCollapsed) return; // this was a selection, not a click
+    if (sel && !sel.isCollapsed) return;
     const pt = caretToPoint(e.clientX, e.clientY);
     if (!pt) return;
     const hits = (highlightsByCh[pt.chapter] ?? []).filter((h) =>
       highlightCoversPoint(h, pt.verse, pt.offset),
     );
-    if (hits.length) setSessions({ pos: { x: Math.min(e.clientX, window.innerWidth - 300), y: e.clientY + 6 }, ids: hits.map((h) => h.id) });
+    if (hits.length) {
+      setSessions({
+        pos: { x: Math.min(e.clientX, window.innerWidth - 300), y: e.clientY + 6 },
+        ids: hits.map((h) => h.id),
+      });
+    }
   };
 
-  // --- notes --------------------------------------------------------------
   const notesFor = (annId) => notes.filter((n) => n.annotationId === annId);
 
   const openAddNote = (anno) => {
@@ -232,7 +230,10 @@ export default function ChapterReader({
 
   const openNoteLink = (id) => {
     setExpanded((s) => new Set(s).add(id));
-    setTimeout(() => document.getElementById(`panel-note-${id}`)?.scrollIntoView({ block: "center", behavior: "smooth" }), 30);
+    setTimeout(
+      () => document.getElementById(`panel-note-${id}`)?.scrollIntoView({ block: "center", behavior: "smooth" }),
+      30,
+    );
   };
   const openRef = (ref) => {
     if (ref?.book) onChangeLocation(ref.book, ref.chapter ?? 1);
@@ -244,140 +245,167 @@ export default function ChapterReader({
   const goto = (ch) => onChangeLocation(bookName, ch);
 
   return (
-    <main className="page reader">
-      <div className="reader-nav">
-        <select value={bookName} onChange={(e) => onChangeLocation(e.target.value, 1)}>
-          <optgroup label="Old Testament">
-            {BIBLE.slice(0, OT_COUNT).map((b) => (
-              <option key={b.name}>{b.name}</option>
+    <main className="reader-canvas">
+      <header className="reader-toolbar">
+        <div className="reader-toolbar-section">
+          <select className="reader-select" value={bookName} onChange={(e) => onChangeLocation(e.target.value, 1)}>
+            <optgroup label="Old Testament">
+              {BIBLE.slice(0, OT_COUNT).map((b) => (
+                <option key={b.name}>{b.name}</option>
+              ))}
+            </optgroup>
+            <optgroup label="New Testament">
+              {BIBLE.slice(OT_COUNT).map((b) => (
+                <option key={b.name}>{b.name}</option>
+              ))}
+            </optgroup>
+          </select>
+          <select className="reader-select reader-select-ch" value={chapters[0]} onChange={(e) => goto(Number(e.target.value))}>
+            {book.chapters.map((_, i) => (
+              <option key={i + 1} value={i + 1}>
+                Ch. {i + 1}
+              </option>
             ))}
-          </optgroup>
-          <optgroup label="New Testament">
-            {BIBLE.slice(OT_COUNT).map((b) => (
-              <option key={b.name}>{b.name}</option>
-            ))}
-          </optgroup>
-        </select>
-        <select value={chapters[0]} onChange={(e) => goto(Number(e.target.value))}>
-          {book.chapters.map((_, i) => (
-            <option key={i + 1} value={i + 1}>Chapter {i + 1}</option>
-          ))}
-        </select>
-        <button className="ghost-btn" disabled={!canPrev} onClick={() => goto(chapters[0] - 1)}>← Prev</button>
-        <button className="ghost-btn" disabled={!canNext} onClick={() => goto(lastCh + 1)}>Next →</button>
+          </select>
+        </div>
 
-        <div className="reader-pen">
+        <div className="reader-toolbar-section reader-toolbar-nav">
+          <button type="button" className="reader-pill-btn" disabled={!canPrev} onClick={() => goto(chapters[0] - 1)} aria-label="Previous chapter">
+            ‹
+          </button>
+          <button type="button" className="reader-pill-btn" disabled={!canNext} onClick={() => goto(lastCh + 1)} aria-label="Next chapter">
+            ›
+          </button>
+        </div>
+
+        <div className="reader-toolbar-section reader-toolbar-tools">
           <button
-            className={`pen-toggle${annotate ? " on" : ""}`}
+            type="button"
+            className={`reader-tool-toggle${annotate ? " active" : ""}`}
             onClick={() => {
               setAnnotate((a) => !a);
               setPending(null);
               setSessions(null);
             }}
           >
-            {annotate ? "✎ Annotating" : "✎ Annotate"}
+            <span className="reader-tool-icon" aria-hidden="true">✎</span>
+            {annotate ? "Annotating" : "Annotate"}
           </button>
           {annotate && (
-            <div className="pen-styles">
-              <button className={penStyle === "fill" ? "active" : ""} onClick={() => setPenStyle("fill")}>▬ Fill</button>
-              <button className={penStyle === "scribble" ? "active" : ""} onClick={() => setPenStyle("scribble")}>◯ Scribble</button>
+            <div className="reader-pen-modes">
+              <button
+                type="button"
+                className={`reader-pen-mode${penStyle === "fill" ? " active" : ""}`}
+                onClick={() => setPenStyle("fill")}
+              >
+                Highlight
+              </button>
+              <button
+                type="button"
+                className={`reader-pen-mode${penStyle === "scribble" ? " active" : ""}`}
+                onClick={() => setPenStyle("scribble")}
+              >
+                Scribble
+              </button>
             </div>
           )}
         </div>
-      </div>
+      </header>
 
       {annotate && (
-        <p className="reader-hint">
-          Select any words or a verse (or tap a verse number) to highlight. Click a highlight to add a note or remove it.
+        <p className="reader-annotate-tip">
+          Select text or tap a verse number to highlight. Tap a highlight to add notes.
         </p>
       )}
 
-      <div className="reader-body">
-        <article
-          className="reader-text"
-          ref={articleRef}
-          onMouseUp={onMouseUp}
-          onClick={onArticleClick}
-        >
-          {chapters.map((ch) => {
-            const verses = verseMap[ch];
-            const fillHls = (highlightsByCh[ch] ?? []).filter((h) => h.style !== "scribble");
-            return (
-              <section key={ch} className="rd-chapter" data-ch={ch}>
-                <h2 className="rd-chapter-head">{bookName} {ch}</h2>
-                {!verses ? (
-                  <p className="rd-loading">Loading…</p>
-                ) : verses.length === 0 ? (
-                  <p className="rd-loading">No text found.</p>
-                ) : (
-                  <p className="rd-prose">
-                    {verses.map(({ verse, text }) => {
-                      const readCount = counts.get(`${ch}:${verse}`)?.count ?? 0;
-                      const hasNote = (noteMarks.get(`${ch}:${verse}`) ?? 0) > 0;
-                      const intervals = fillIntervalsForVerse(fillHls, verse, text.length);
-                      const segs = segmentVerseFill(text, intervals);
-                      return (
-                        <span key={verse} className={`rd-verse${readCount > 0 ? " read" : ""}`}>
-                          <sup
-                            className={`rd-vnum${annotate ? " annot" : ""}`}
-                            onClick={() => onVnum(ch, verse)}
-                          >
-                            {verse}
-                            {readCount > 0 && <span className="rd-read-dot" />}
-                            {hasNote && <span className="rd-note-dot" />}
-                          </sup>
-                          <span className="rd-vtext" data-ch={ch} data-v={verse}>
-                            {segs.map((seg, i) =>
-                              seg.hls ? (
-                                <mark
-                                  key={i}
-                                  className="rd-hl"
-                                  style={{ background: blendFill(seg.hls.map((h) => h.color)) }}
-                                >
-                                  {seg.text}
-                                </mark>
-                              ) : (
-                                <span key={i}>{seg.text}</span>
-                              ),
-                            )}
-                          </span>{" "}
-                        </span>
-                      );
-                    })}
-                  </p>
-                )}
-              </section>
-            );
-          })}
-          <ScribbleOverlay containerRef={articleRef} scribbles={scribbles} revision={overlayRevision} />
-        </article>
+      <div className="reader-stage">
+        <div className="reader-desk">
+          <article
+            className="reader-page"
+            ref={articleRef}
+            onMouseUp={onMouseUp}
+            onClick={onArticleClick}
+          >
+            {chapters.map((ch) => {
+              const verses = verseMap[ch];
+              const fillHls = (highlightsByCh[ch] ?? []).filter((h) => h.style !== "scribble");
+              return (
+                <section key={ch} className="rd-chapter" data-ch={ch}>
+                  <h2 className="rd-chapter-head">{bookName} {ch}</h2>
+                  {!verses ? (
+                    <p className="rd-loading">Loading chapter…</p>
+                  ) : verses.length === 0 ? (
+                    <p className="rd-loading">No text found.</p>
+                  ) : (
+                    <p className="rd-prose">
+                      {verses.map(({ verse, text }) => {
+                        const readCount = counts.get(`${ch}:${verse}`)?.count ?? 0;
+                        const hasNote = (noteMarks.get(`${ch}:${verse}`) ?? 0) > 0;
+                        const intervals = fillIntervalsForVerse(fillHls, verse, text.length);
+                        const segs = segmentVerseFill(text, intervals);
+                        return (
+                          <span key={verse} className={`rd-verse${readCount > 0 ? " read" : ""}`}>
+                            <sup
+                              className={`rd-vnum${annotate ? " annot" : ""}`}
+                              onClick={() => onVnum(ch, verse)}
+                            >
+                              {verse}
+                              {readCount > 0 && <span className="rd-read-dot" />}
+                              {hasNote && <span className="rd-note-dot" />}
+                            </sup>
+                            <span className="rd-vtext" data-ch={ch} data-v={verse}>
+                              {segs.map((seg, i) =>
+                                seg.hls ? (
+                                  <mark
+                                    key={i}
+                                    className="rd-hl"
+                                    style={{ background: blendFill(seg.hls.map((h) => h.color)) }}
+                                  >
+                                    {seg.text}
+                                  </mark>
+                                ) : (
+                                  <span key={i}>{seg.text}</span>
+                                ),
+                              )}
+                            </span>{" "}
+                          </span>
+                        );
+                      })}
+                    </p>
+                  )}
+                </section>
+              );
+            })}
+            <ScribbleOverlay containerRef={articleRef} scribbles={scribbles} revision={overlayRevision} />
+          </article>
 
-        <NotesPanel
-          notes={pageNotes}
-          expanded={expanded}
-          onToggle={(id) =>
-            setExpanded((s) => {
-              const n = new Set(s);
-              n.has(id) ? n.delete(id) : n.add(id);
-              return n;
-            })
-          }
-          onExpandAll={() => setExpanded(new Set(pageNotes.map((n) => n.id)))}
-          onCollapseAll={() => setExpanded(new Set())}
-          onEdit={openEditNote}
-          onOpenNoteLink={openNoteLink}
-          onOpenRef={openRef}
-        />
+          <NotesPanel
+            notes={pageNotes}
+            expanded={expanded}
+            onToggle={(id) =>
+              setExpanded((s) => {
+                const n = new Set(s);
+                n.has(id) ? n.delete(id) : n.add(id);
+                return n;
+              })
+            }
+            onExpandAll={() => setExpanded(new Set(pageNotes.map((n) => n.id)))}
+            onCollapseAll={() => setExpanded(new Set())}
+            onEdit={openEditNote}
+            onOpenNoteLink={openNoteLink}
+            onOpenRef={openRef}
+          />
+        </div>
       </div>
 
-      <div className="reader-foot">
+      <footer className="reader-footer">
         {canNext && (
-          <button className="ghost-btn" onClick={() => setChapters((c) => [...c, lastCh + 1])}>
-            + Show {bookName} {lastCh + 1}
+          <button type="button" className="reader-pill-btn reader-pill-btn-wide" onClick={() => setChapters((c) => [...c, lastCh + 1])}>
+            + Continue to {bookName} {lastCh + 1}
           </button>
         )}
         <span className="reader-credit">{WEB_CREDIT}</span>
-      </div>
+      </footer>
 
       {pending && (
         <SelectionPopover
