@@ -14,6 +14,7 @@ import GraphView from "./components/GraphView";
 import CommandPalette from "./components/CommandPalette";
 import ProfilePicker from "./components/ProfilePicker";
 import ProfileAvatar from "./components/ProfileAvatar";
+import BlitzGame from "./components/game/BlitzGame";
 
 const THEME_KEY = "bible-viz:theme";
 
@@ -135,6 +136,7 @@ export default function App() {
           </button>
           {navItem("notes", "Notes")}
           {navItem("graph", "Graph")}
+          {navItem("blitz", "Blitz")}
           {navItem("log", "+ Log a read")}
           <button
             className="nav-btn theme-btn"
@@ -224,6 +226,7 @@ export default function App() {
           onOpenTopic={openTopic}
         />
       )}
+      {view.name === "blitz" && <BlitzGame profile={profile} />}
       {view.name === "book" && (
         <BookView
           bookName={view.book}
