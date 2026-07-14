@@ -58,3 +58,63 @@ create policy "reads are public"             on public.reads for select using (t
 create policy "anyone can add a read"        on public.reads for insert with check (true);
 create policy "anyone can update a read"     on public.reads for update using (true) with check (true);
 create policy "anyone can delete a read"     on public.reads for delete using (true);
+
+-- ── Bible Blitz game (embedded feature) ────────────────────────────────
+-- A "session" groups the rounds played in one sitting; each round result is
+-- stored individually. Both are keyed to a profile (the same profiles table
+-- above — the game inherits whichever profile is selected in the app).
+
+create table if not exists public.trainer_sessions (
+  id             uuid primary key default gen_random_uuid(),
+  profile_id     uuid not null references public.profiles (id) on delete cascade,
+  mode           text not null check (mode in ('all', 'ot', 'nt')),
+  total_score    integer not null default 0,
+  rounds_played  integer not null default 0,
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now()
+);
+
+create table if not exists public.trainer_rounds (
+  id             uuid primary key default gen_random_uuid(),
+  profile_id     uuid not null references public.profiles (id) on delete cascade,
+  session_id     uuid references public.trainer_sessions (id) on delete set null,
+  mode           text not null check (mode in ('all', 'ot', 'nt')),
+  start_book     text not null,
+  target_book    text not null,
+  score          integer not null,
+  moves          integer not null,
+  correct_moves  integer not null,
+  wrong_moves    integer not null,
+  elapsed_ms     integer not null,
+  failed         boolean not null default false,
+  created_at     timestamptz not null default now()
+);
+
+create index if not exists trainer_sessions_profile_id_idx  on public.trainer_sessions (profile_id);
+create index if not exists trainer_sessions_total_score_idx on public.trainer_sessions (total_score desc);
+create index if not exists trainer_rounds_profile_id_idx    on public.trainer_rounds (profile_id);
+create index if not exists trainer_rounds_score_idx         on public.trainer_rounds (score desc);
+create index if not exists trainer_rounds_created_at_idx    on public.trainer_rounds (created_at desc);
+
+grant all on public.trainer_sessions to anon, authenticated;
+grant all on public.trainer_rounds to anon, authenticated;
+
+alter table public.trainer_sessions enable row level security;
+alter table public.trainer_rounds enable row level security;
+
+do $$ begin
+  create policy "sessions are public"      on public.trainer_sessions for select using (true);
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create policy "anyone can create a session" on public.trainer_sessions for insert with check (true);
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create policy "anyone can update a session" on public.trainer_sessions for update using (true) with check (true);
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create policy "rounds are public"        on public.trainer_rounds for select using (true);
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create policy "anyone can add a round"   on public.trainer_rounds for insert with check (true);
+exception when duplicate_object then null; end $$;
