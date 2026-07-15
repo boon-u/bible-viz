@@ -128,6 +128,7 @@ export default function App() {
         </button>
         <nav>
           {navItem("overview", "Overview")}
+          {/* Nav hidden (code kept): Read / Notes / Graph
           <button
             className={view.name === "read" ? "nav-btn active" : "nav-btn"}
             onClick={openReadDefault}
@@ -136,6 +137,7 @@ export default function App() {
           </button>
           {navItem("notes", "Notes")}
           {navItem("graph", "Graph")}
+          */}
           {navItem("blitz", "Blitz")}
           {navItem("log", "+ Log a read")}
           <button
